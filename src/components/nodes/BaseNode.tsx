@@ -30,12 +30,31 @@ export function BaseNode(props: NodeProps) {
   const nodeType: string = String(props.type || 'import');
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const handleFileSelect = useCallback((file: File) => {
-    const url = URL.createObjectURL(file);
+  const handleFileSelect = useCallback(async (file: File) => {
     const store = useFlowStore.getState();
+    // Show local preview immediately
+    const localUrl = URL.createObjectURL(file);
     store.updateNodeSetting(id, 'fileName', file.name);
-    store.updateNodeSetting(id, 'fileUrl', url);
+    store.updateNodeSetting(id, 'fileUrl', localUrl);
     store.updateNodeSetting(id, 'fileType', file.type);
+    store.updateNodeSetting(id, 'uploading', true);
+
+    // Upload to fal.ai storage via our API route
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+      const res = await fetch('/api/fal/upload', { method: 'POST', body: formData });
+      const json = await res.json();
+      if (json.url) {
+        store.updateNodeSetting(id, 'remoteUrl', json.url);
+      } else {
+        console.error('Upload failed:', json.error);
+      }
+    } catch (err) {
+      console.error('Upload error:', err);
+    } finally {
+      store.updateNodeSetting(id, 'uploading', false);
+    }
   }, [id]);
 
   const statusColor =
@@ -137,7 +156,14 @@ export function BaseNode(props: NodeProps) {
                     className="w-full rounded-lg max-h-[120px] object-cover"
                   />
                 )}
-                <div className="text-[10px] text-zinc-400 mt-1 truncate">{data.settings.fileName as string}</div>
+                <div className="text-[10px] text-zinc-400 mt-1 truncate flex items-center gap-1">
+                  {data.settings.uploading ? (
+                    <span className="text-yellow-400">Uploading...</span>
+                  ) : data.settings.remoteUrl ? (
+                    <span className="text-green-400">✓</span>
+                  ) : null}
+                  {data.settings.fileName as string}
+                </div>
                 <button
                   className="absolute top-1 right-1 w-5 h-5 rounded-full bg-zinc-900/80 text-zinc-400 hover:text-white text-xs opacity-0 group-hover:opacity-100 transition-opacity nodrag"
                   onClick={(e) => {

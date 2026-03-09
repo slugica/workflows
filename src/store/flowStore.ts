@@ -111,6 +111,10 @@ export const useFlowStore = create<FlowState>((set, get) => ({
     const targetType = parseHandleType(targetHandle);
     if (!sourceType || !targetType || sourceType !== targetType) return;
 
+    // Prevent multiple connections to the same target handle
+    const existingEdgeToHandle = get().edges.find((e) => e.targetHandle === targetHandle);
+    if (existingEdgeToHandle) return;
+
     const newEdge: Edge = {
       ...connection,
       id: `${connection.source}-${connection.target}-${generateId()}`,
@@ -125,11 +129,17 @@ export const useFlowStore = create<FlowState>((set, get) => ({
       if (n.id !== targetNodeId) return n;
       const data = n.data as unknown as FlowNodeData;
       const connectedHandle = data.handles.inputs.find((h: HandleDef) => h.id === targetHandle);
-      if (!connectedHandle?.dynamic || !connectedHandle.dynamicBase || !connectedHandle.maxDynamic) return n;
+      console.log('[Dynamic] targetHandle:', targetHandle);
+      console.log('[Dynamic] connectedHandle:', connectedHandle ? { key: connectedHandle.key, dynamic: connectedHandle.dynamic, dynamicBase: connectedHandle.dynamicBase, maxDynamic: connectedHandle.maxDynamic } : 'NOT FOUND');
+      if (!connectedHandle?.dynamic || !connectedHandle.dynamicBase || !connectedHandle.maxDynamic) {
+        console.log('[Dynamic] SKIP: not dynamic or missing base/max');
+        return n;
+      }
 
       // Count how many handles share this dynamicBase
       const base = connectedHandle.dynamicBase;
       const existing = data.handles.inputs.filter((h: HandleDef) => h.dynamicBase === base);
+      console.log('[Dynamic] existing count:', existing.length, 'max:', connectedHandle.maxDynamic);
       if (existing.length >= connectedHandle.maxDynamic) return n;
 
       // Check if there's already an unconnected one — if so, don't add another
@@ -137,6 +147,7 @@ export const useFlowStore = create<FlowState>((set, get) => ({
         newEdges.filter((e) => e.target === targetNodeId).map((e) => e.targetHandle)
       );
       const hasEmpty = existing.some((h: HandleDef) => !connectedHandleIds.has(h.id));
+      console.log('[Dynamic] hasEmpty:', hasEmpty);
       if (hasEmpty) return n;
 
       // Spawn a new handle
@@ -151,6 +162,7 @@ export const useFlowStore = create<FlowState>((set, get) => ({
         maxDynamic: connectedHandle.maxDynamic,
         dynamicBase: base,
       };
+      console.log('[Dynamic] SPAWNING new handle:', newHandle.key, newHandle.id);
 
       return {
         ...n,

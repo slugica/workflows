@@ -96,9 +96,16 @@ function resolveOutputValue(sourceData: FlowNodeData, sourceHandleId: string | n
     return sourceData.settings.promptText as string || '';
   }
 
-  // Import/upload node → file URL
-  if (handleKey === 'file' && sourceData.settings.fileUrl) {
-    return sourceData.settings.fileUrl as string;
+  // Import/upload node → use remote URL (uploaded to fal.ai storage)
+  if (handleKey === 'file') {
+    // Prefer remoteUrl (fal.ai storage) over local blob URL
+    if (sourceData.settings.remoteUrl) {
+      return sourceData.settings.remoteUrl as string;
+    }
+    // Fallback to local URL (won't work for fal.ai but might for other providers)
+    if (sourceData.settings.fileUrl) {
+      return sourceData.settings.fileUrl as string;
+    }
   }
 
   // AI node results → look for image/video URL in results
@@ -238,12 +245,24 @@ export async function executeNode(
   // Build request
   const falInput = buildFalInput(collectedInputs, data.settings, model);
 
+  // Auto-switch to /edit endpoint when image_urls are present
+  // Models like nano-banana-pro and nano-banana-2 have separate generation and edit endpoints
+  let effectiveModelId = modelId;
+  const hasImageUrls = Array.isArray(falInput.image_urls) && (falInput.image_urls as unknown[]).length > 0;
+  const editableModels: Record<string, string> = {
+    'fal-ai/nano-banana-pro': 'fal-ai/nano-banana-pro/edit',
+    'fal-ai/nano-banana-2': 'fal-ai/nano-banana-2/edit',
+  };
+  if (hasImageUrls && editableModels[modelId]) {
+    effectiveModelId = editableModels[modelId];
+  }
+
   // Call our API route
   try {
     const res = await fetch('/api/fal', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ modelId, input: falInput }),
+      body: JSON.stringify({ modelId: effectiveModelId, input: falInput }),
     });
 
     const json = await res.json();
