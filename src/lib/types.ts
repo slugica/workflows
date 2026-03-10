@@ -36,7 +36,7 @@ export interface FlowNodeData {
   errorMessage?: string;
 }
 
-export type FlowNodeType = 'import' | 'prompt' | 'image' | 'video' | 'audio' | 'textUtility' | 'crop' | 'export' | 'preview' | 'blur' | 'resize';
+export type FlowNodeType = 'import' | 'prompt' | 'image' | 'video' | 'audio' | 'textUtility' | 'crop' | 'export' | 'preview' | 'blur' | 'resize' | 'filters';
 
 export interface NodeTemplate {
   type: FlowNodeType;
@@ -163,6 +163,19 @@ const STATIC_TEMPLATES: NodeTemplate[] = [
   {
     type: 'resize',
     label: 'Resize',
+    category: 'Utility',
+    defaultData: {
+      behavior: 'static',
+      handles: {
+        inputs: [{ id: '', key: 'file', label: 'File', type: 'image', required: true }],
+        outputs: [{ id: '', key: 'file', label: 'File', type: 'image' }],
+      },
+      settings: {},
+    },
+  },
+  {
+    type: 'filters',
+    label: 'Filters',
     category: 'Utility',
     defaultData: {
       behavior: 'static',
