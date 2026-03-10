@@ -64,6 +64,15 @@ body {
   background-size: 20px 20px;
 }
 
+/* ReactCrop handle overrides — small subtle handles */
+.ReactCrop .ReactCrop__drag-handle {
+  width: 8px !important;
+  height: 8px !important;
+  background-color: rgba(255, 255, 255, 0.85) !important;
+  border: 1px solid rgba(0, 0, 0, 0.2) !important;
+  border-radius: 1px !important;
+}
+
 /* Node transitions */
 .react-flow__node {
   transition: box-shadow 0.3s cubic-bezier(0.4, 0, 0.2, 1);

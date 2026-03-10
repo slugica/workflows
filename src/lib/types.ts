@@ -36,7 +36,7 @@ export interface FlowNodeData {
   errorMessage?: string;
 }
 
-export type FlowNodeType = 'import' | 'prompt' | 'image' | 'video' | 'audio' | 'textUtility';
+export type FlowNodeType = 'import' | 'prompt' | 'image' | 'video' | 'audio' | 'textUtility' | 'crop' | 'export' | 'preview';
 
 export interface NodeTemplate {
   type: FlowNodeType;
@@ -104,6 +104,45 @@ const STATIC_TEMPLATES: NodeTemplate[] = [
       handles: {
         inputs: [{ id: '', key: 'prompt', label: 'Input', type: 'text', required: false }],
         outputs: [{ id: '', key: 'prompt', label: 'Prompt', type: 'text' }],
+      },
+      settings: {},
+    },
+  },
+  {
+    type: 'preview',
+    label: 'Preview',
+    category: 'Essentials',
+    defaultData: {
+      behavior: 'static',
+      handles: {
+        inputs: [{ id: '', key: 'file', label: 'File', type: 'image', required: false }],
+        outputs: [{ id: '', key: 'file', label: 'File', type: 'image' }],
+      },
+      settings: {},
+    },
+  },
+  {
+    type: 'export',
+    label: 'Export',
+    category: 'Essentials',
+    defaultData: {
+      behavior: 'static',
+      handles: {
+        inputs: [{ id: '', key: 'file', label: 'Input', type: 'image', required: true }],
+        outputs: [],
+      },
+      settings: { fileType: 'png', scale: 1 },
+    },
+  },
+  {
+    type: 'crop',
+    label: 'Crop',
+    category: 'Utility',
+    defaultData: {
+      behavior: 'static',
+      handles: {
+        inputs: [{ id: '', key: 'file', label: 'File', type: 'image', required: true }],
+        outputs: [{ id: '', key: 'file', label: 'Image', type: 'image' }],
       },
       settings: {},
     },

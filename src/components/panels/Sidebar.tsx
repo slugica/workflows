@@ -4,7 +4,7 @@ import { useState, type ReactNode } from 'react';
 import { useReactFlow } from '@xyflow/react';
 import { NODE_TEMPLATES, FlowNodeType } from '@/lib/types';
 import { useFlowStore } from '@/store/flowStore';
-import { Upload, Type, ImageIcon, Video, AudioLines, Bot, Zap, Pencil, Search, Wrench, MessageSquare } from 'lucide-react';
+import { Upload, Type, ImageIcon, Video, AudioLines, Bot, Zap, Pencil, Search, Wrench, MessageSquare, Crop, Download, ScanLine } from 'lucide-react';
 
 // ── Quick-add buttons (top section) ──────────────────────────────────────────
 
@@ -291,7 +291,7 @@ function ModelItem({
       onClick={onAdd}
     >
       <span className="w-6 h-6 rounded-md bg-[#212121] flex items-center justify-center text-[11px] group-hover:bg-[#2a2a2a] transition-colors">
-        {type === 'image' ? <ImageIcon size={11} /> : type === 'video' ? <Video size={11} /> : type === 'audio' ? <AudioLines size={11} /> : type === 'prompt' ? <Type size={11} /> : type === 'import' ? <Upload size={11} /> : <Bot size={11} />}
+        {type === 'image' ? <ImageIcon size={11} /> : type === 'video' ? <Video size={11} /> : type === 'audio' ? <AudioLines size={11} /> : type === 'prompt' ? <Type size={11} /> : type === 'import' ? <Upload size={11} /> : type === 'crop' ? <Crop size={11} /> : type === 'export' ? <Download size={11} /> : type === 'preview' ? <ScanLine size={11} /> : <Bot size={11} />}
       </span>
       <div className="flex-1 min-w-0">
         <div className="text-[13px] text-zinc-300 truncate">{label}</div>

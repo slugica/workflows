@@ -1,6 +1,6 @@
 'use client';
 
-import { useRef, useCallback, useMemo, type ReactNode } from 'react';
+import { useRef, useCallback, useMemo, useState, type ReactNode } from 'react';
 import { Handle, Position, useEdges, type NodeProps } from '@xyflow/react';
 import { FlowNodeData, HANDLE_COLORS } from '@/lib/types';
 import { useFlowStore } from '@/store/flowStore';
@@ -46,6 +46,22 @@ export function BaseNode(props: NodeProps) {
       .map((h) => h.label);
   }, [data.handles.inputs, connectedHandles]);
 
+  // Compute content area size like Imagine: max 480x427, min 320x320
+  const [imgNatural, setImgNatural] = useState<{ w: number; h: number } | null>(null);
+  const contentSize = useMemo(() => {
+    if (!imgNatural) return null;
+    const MAX_W = 480, MAX_H = 427;
+    const { w, h } = imgNatural;
+    const ratio = w / h;
+    let cw = MAX_W;
+    let ch = cw / ratio;
+    if (ch > MAX_H) {
+      ch = MAX_H;
+      cw = ch * ratio;
+    }
+    return { w: Math.round(cw), h: Math.round(ch) };
+  }, [imgNatural]);
+
   const handleFileSelect = useCallback(async (file: File) => {
     const store = useFlowStore.getState();
     const localUrl = URL.createObjectURL(file);
@@ -61,6 +77,7 @@ export function BaseNode(props: NodeProps) {
       const json = await res.json();
       if (json.url) {
         store.updateNodeSetting(id, 'remoteUrl', json.url);
+        store.updateNodeSetting(id, 'fileUrl', json.url);
       } else {
         console.error('Upload failed:', json.error);
       }
@@ -73,7 +90,8 @@ export function BaseNode(props: NodeProps) {
 
   return (
     <div
-      className="group relative flex flex-col items-center gap-1 w-[356px]"
+      className="group relative flex flex-col items-center gap-1"
+      style={{ width: contentSize ? contentSize.w + 36 : 356 }}
       onClick={() => selectNode(id)}
     >
       {/* Top info bar - above the card */}
@@ -201,18 +219,22 @@ export function BaseNode(props: NodeProps) {
               }}
             />
             {data.settings.fileUrl ? (
-              <div className="relative bg-[#212121] rounded-2xl overflow-hidden">
+              <div
+                className="relative bg-[#212121] rounded-2xl overflow-hidden"
+                style={contentSize ? { width: contentSize.w, height: contentSize.h } : undefined}
+              >
                 {(data.settings.fileType as string)?.startsWith('video/') ? (
                   <video
                     src={data.settings.fileUrl as string}
-                    className="w-full max-h-[400px] object-cover"
+                    className="w-full h-full object-cover"
                     muted
                   />
                 ) : (
                   <img
                     src={data.settings.fileUrl as string}
                     alt={data.settings.fileName as string}
-                    className="w-full max-h-[400px] object-cover"
+                    className="w-full h-full object-cover"
+                    onLoad={(e) => setImgNatural({ w: e.currentTarget.naturalWidth, h: e.currentTarget.naturalHeight })}
                   />
                 )}
                 {data.settings.uploading ? (
@@ -222,7 +244,7 @@ export function BaseNode(props: NodeProps) {
             ) : (
               <label
                 htmlFor={`file-input-${id}`}
-                className="bg-[#212121] rounded-2xl p-8 text-center cursor-pointer hover:bg-[#292929] transition-colors nodrag block"
+                className="bg-[#212121] rounded-2xl p-8 text-center cursor-pointer hover:bg-[#292929] transition-colors nodrag block aspect-square flex items-center justify-center"
                 onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); }}
                 onDrop={(e) => {
                   e.preventDefault();
@@ -264,7 +286,7 @@ export function BaseNode(props: NodeProps) {
                   return (
                     <video
                       src={entry.content}
-                      className="w-full max-h-[400px] object-cover"
+                      className="w-full"
                       controls
                       muted
                     />
@@ -274,7 +296,7 @@ export function BaseNode(props: NodeProps) {
                   <img
                     src={entry.content}
                     alt="Result"
-                    className="w-full max-h-[400px] object-cover"
+                    className="w-full"
                   />
                 );
               })()}

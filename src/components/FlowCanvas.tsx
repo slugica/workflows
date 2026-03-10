@@ -7,15 +7,23 @@ import {
   Controls,
   MiniMap,
   BackgroundVariant,
+  useViewport,
+  useReactFlow,
+  Panel,
   type NodeTypes,
   type IsValidConnection,
   type Node,
+  type Edge,
+  type Connection,
   type ConnectionLineComponentProps,
   getSmoothStepPath,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 import { useFlowStore } from '@/store/flowStore';
 import { BaseNode } from '@/components/nodes/BaseNode';
+import { CropNode } from '@/components/nodes/CropNode';
+import { ExportNode } from '@/components/nodes/ExportNode';
+import { PreviewNode } from '@/components/nodes/PreviewNode';
 import { FlowNodeType, HANDLE_COLORS, type FlowNodeData } from '@/lib/types';
 
 function CustomConnectionLine({ fromX, fromY, toX, toY, fromNode, fromHandle }: ConnectionLineComponentProps) {
@@ -40,6 +48,9 @@ const nodeTypes: NodeTypes = {
   video: BaseNode,
   audio: BaseNode,
   textUtility: BaseNode,
+  crop: CropNode,
+  export: ExportNode,
+  preview: PreviewNode,
 };
 
 function parseHandleInfo(handleId: string): { direction: string; type: string; key: string } | null {
@@ -48,6 +59,42 @@ function parseHandleInfo(handleId: string): { direction: string; type: string; k
   const segments = parts[1].split(':');
   if (segments.length !== 3) return null;
   return { direction: segments[0], type: segments[1], key: segments[2] };
+}
+
+function ZoomIndicator() {
+  const { zoom } = useViewport();
+  const { zoomTo, fitView } = useReactFlow();
+  const pct = Math.round(zoom * 100);
+
+  return (
+    <div className="flex items-center gap-1 bg-[#171717] border border-[#212121] rounded-lg px-2 py-1 mb-2">
+      <button
+        className="text-[11px] text-zinc-400 hover:text-white px-1.5 py-0.5 rounded transition-colors"
+        onClick={() => zoomTo(Math.max(0.1, zoom - 0.25), { duration: 200 })}
+      >
+        −
+      </button>
+      <button
+        className="text-[11px] text-zinc-300 hover:text-white px-2 py-0.5 rounded hover:bg-[#212121] transition-colors min-w-[44px] text-center"
+        onClick={() => zoomTo(1, { duration: 200 })}
+      >
+        {pct}%
+      </button>
+      <button
+        className="text-[11px] text-zinc-400 hover:text-white px-1.5 py-0.5 rounded transition-colors"
+        onClick={() => zoomTo(Math.min(2, zoom + 0.25), { duration: 200 })}
+      >
+        +
+      </button>
+      <button
+        className="text-[11px] text-zinc-400 hover:text-white px-1.5 py-0.5 rounded transition-colors ml-1"
+        onClick={() => fitView({ duration: 200 })}
+        title="Fit to view"
+      >
+        ⊞
+      </button>
+    </div>
+  );
 }
 
 export function FlowCanvas() {
@@ -101,6 +148,13 @@ export function FlowCanvas() {
     });
   }, []);
 
+  const onReconnect = useCallback((oldEdge: Edge, newConnection: Connection) => {
+    const store = useFlowStore.getState();
+    // Remove old edge, add new connection
+    store.onEdgesChange([{ id: oldEdge.id, type: 'remove' }]);
+    store.onConnect(newConnection);
+  }, []);
+
   const isValidConnection: IsValidConnection = useCallback((connection) => {
     const sourceHandle = connection.sourceHandle;
     const targetHandle = connection.targetHandle;
@@ -127,6 +181,7 @@ export function FlowCanvas() {
         onPaneClick={onPaneClick}
         onNodeClick={onNodeClick}
         onNodesDelete={onNodesDelete}
+        onReconnect={onReconnect}
         onInit={(instance) => {
           reactFlowInstance.current = instance;
         }}
@@ -152,6 +207,9 @@ export function FlowCanvas() {
           nodeColor="#212121"
           maskColor="rgba(0, 0, 0, 0.6)"
         />
+        <Panel position="bottom-center">
+          <ZoomIndicator />
+        </Panel>
       </ReactFlow>
     </div>
   );

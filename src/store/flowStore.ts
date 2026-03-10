@@ -111,9 +111,8 @@ export const useFlowStore = create<FlowState>((set, get) => ({
     const targetType = parseHandleType(targetHandle);
     if (!sourceType || !targetType || sourceType !== targetType) return;
 
-    // Prevent multiple connections to the same target handle
-    const existingEdgeToHandle = get().edges.find((e) => e.targetHandle === targetHandle);
-    if (existingEdgeToHandle) return;
+    // Replace existing connection to the same target handle (allows reconnecting)
+    const filteredEdges = get().edges.filter((e) => e.targetHandle !== targetHandle);
 
     const edgeColor = HANDLE_COLORS[sourceType as HandleDataType] || '#52525b';
     const newEdge: Edge = {
@@ -122,7 +121,7 @@ export const useFlowStore = create<FlowState>((set, get) => ({
       type: 'smoothstep',
       style: { stroke: edgeColor, strokeWidth: 2 },
     };
-    const newEdges = addEdge(newEdge, get().edges);
+    const newEdges = addEdge(newEdge, filteredEdges);
 
     // Dynamic handle spawning: if the connected target handle is dynamic,
     // add a new empty handle slot (up to maxDynamic)
