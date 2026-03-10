@@ -1,8 +1,9 @@
 @import "tailwindcss";
 
 :root {
-  --background: #09090b;
+  --background: #0F0F0F;
   --foreground: #fafafa;
+  color-scheme: dark;
 }
 
 @theme inline {
@@ -21,33 +22,43 @@ body {
 
 /* React Flow dark theme overrides */
 .react-flow__controls button {
-  background-color: #18181b !important;
-  border-color: #3f3f46 !important;
+  background-color: #171717 !important;
+  border-color: #212121 !important;
   color: #a1a1aa !important;
 }
 
 .react-flow__controls button:hover {
-  background-color: #27272a !important;
+  background-color: #212121 !important;
 }
 
 .react-flow__minimap {
-  background-color: #18181b !important;
+  background-color: #171717 !important;
 }
 
 .react-flow__edge-path {
-  stroke: #52525b !important;
   stroke-width: 2 !important;
+  opacity: 0.6;
 }
 
 .react-flow__edge.selected .react-flow__edge-path,
 .react-flow__edge:hover .react-flow__edge-path {
-  stroke: #a1a1aa !important;
+  opacity: 1;
 }
 
 .react-flow__handle {
-  transition: transform 0.15s ease;
+  transition: scale 0.15s ease;
+  pointer-events: auto !important;
 }
 
 .react-flow__handle:hover {
-  transform: scale(1.3);
+  scale: 1.4;
+}
+
+.show-labels .handle-label {
+  opacity: 1 !important;
+}
+
+/* Node transitions */
+.react-flow__node {
+  transition: box-shadow 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }

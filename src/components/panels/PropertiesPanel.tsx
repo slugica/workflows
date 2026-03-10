@@ -17,7 +17,7 @@ function SettingControl({
     case 'select':
       return (
         <select
-          className="w-full bg-zinc-900 text-zinc-200 text-xs rounded-lg px-3 py-2 border border-zinc-800 focus:outline-none"
+          className="w-full bg-[#171717] text-zinc-200 text-xs rounded-lg px-3 py-2 border border-[#212121] focus:outline-none"
           value={String(value ?? def.default ?? '')}
           onChange={(e) => onChange(e.target.value)}
         >
@@ -54,7 +54,7 @@ function SettingControl({
           min={def.min}
           max={def.max}
           step={def.step}
-          className="w-full bg-zinc-900 text-zinc-200 text-xs rounded-lg px-3 py-2 border border-zinc-800 focus:outline-none"
+          className="w-full bg-[#171717] text-zinc-200 text-xs rounded-lg px-3 py-2 border border-[#212121] focus:outline-none"
           value={value != null ? String(value) : ''}
           placeholder={def.description || ''}
           onChange={(e) => {
@@ -68,7 +68,7 @@ function SettingControl({
       return (
         <button
           className={`w-10 h-5 rounded-full transition-colors relative ${
-            value ? 'bg-emerald-600' : 'bg-zinc-700'
+            value ? 'bg-emerald-600' : 'bg-[#2a2a2a]'
           }`}
           onClick={() => onChange(!value)}
         >
@@ -83,7 +83,7 @@ function SettingControl({
     case 'text':
       return (
         <textarea
-          className="w-full bg-zinc-900 text-zinc-200 text-xs rounded-lg px-3 py-2 border border-zinc-800 focus:outline-none resize-none"
+          className="w-full bg-[#171717] text-zinc-200 text-xs rounded-lg px-3 py-2 border border-[#212121] focus:outline-none resize-none"
           rows={2}
           value={String(value ?? def.default ?? '')}
           placeholder={def.description || ''}
@@ -107,7 +107,7 @@ export function PropertiesPanel() {
 
   if (!selectedNode) {
     return (
-      <div className="w-[280px] bg-zinc-950 border-l border-zinc-800 flex items-center justify-center">
+      <div className="w-[280px] bg-[#0F0F0F] border-l border-[#212121] flex items-center justify-center">
         <p className="text-zinc-600 text-xs">Select a node to see properties</p>
       </div>
     );
@@ -119,13 +119,13 @@ export function PropertiesPanel() {
   const modelDef = modelId ? getModelById(modelId) : null;
 
   return (
-    <div className="w-[280px] bg-zinc-950 border-l border-zinc-800 flex flex-col h-full">
+    <div className="w-[280px] bg-[#0F0F0F] border-l border-[#212121] flex flex-col h-full">
       {/* Header */}
-      <div className="p-3 border-b border-zinc-800 flex items-center justify-between">
+      <div className="p-3 border-b border-[#212121] flex items-center justify-between">
         <h2 className="text-sm font-semibold text-zinc-200">Properties</h2>
         <button
           onClick={() => deleteNode(selectedNode.id)}
-          className="text-xs text-red-400 hover:text-red-300 px-2 py-1 rounded hover:bg-zinc-800"
+          className="text-xs text-red-400 hover:text-red-300 px-2 py-1 rounded hover:bg-[#212121]"
         >
           Delete
         </button>
@@ -137,7 +137,7 @@ export function PropertiesPanel() {
           <label className="text-[11px] text-zinc-500 block mb-1">Name</label>
           <input
             type="text"
-            className="w-full bg-zinc-900 text-zinc-200 text-xs rounded-lg px-3 py-2 border border-zinc-800 focus:border-zinc-600 focus:outline-none"
+            className="w-full bg-[#171717] text-zinc-200 text-xs rounded-lg px-3 py-2 border border-[#212121] focus:border-[#333] focus:outline-none"
             value={nodeData.name}
             onChange={(e) => updateNodeData(selectedNode.id, { name: e.target.value })}
           />
@@ -146,7 +146,7 @@ export function PropertiesPanel() {
         {/* Type & Model */}
         <div>
           <label className="text-[11px] text-zinc-500 block mb-1">Type</label>
-          <span className="text-xs px-2 py-1 rounded bg-zinc-800 text-zinc-300">
+          <span className="text-xs px-2 py-1 rounded bg-[#212121] text-zinc-300">
             {selectedNode.type} ({nodeData.behavior})
           </span>
           {modelDef && (
@@ -190,7 +190,7 @@ export function PropertiesPanel() {
                         {key === 'systemPrompt' ? 'System Prompt' : 'Prompt'}
                       </label>
                       <textarea
-                        className="w-full bg-zinc-900 text-zinc-200 text-xs rounded-lg px-3 py-2 border border-zinc-800 focus:outline-none resize-none"
+                        className="w-full bg-[#171717] text-zinc-200 text-xs rounded-lg px-3 py-2 border border-[#212121] focus:outline-none resize-none"
                         rows={4}
                         value={String(value || '')}
                         onChange={(e) => updateNodeSetting(selectedNode.id, key, e.target.value)}
@@ -205,7 +205,7 @@ export function PropertiesPanel() {
                       <label className="text-[10px] text-zinc-600 block mb-1">{key}</label>
                       <input
                         type="number"
-                        className="w-full bg-zinc-900 text-zinc-200 text-xs rounded-lg px-3 py-2 border border-zinc-800 focus:outline-none"
+                        className="w-full bg-[#171717] text-zinc-200 text-xs rounded-lg px-3 py-2 border border-[#212121] focus:outline-none"
                         value={value}
                         onChange={(e) => updateNodeSetting(selectedNode.id, key, Number(e.target.value))}
                       />
@@ -219,7 +219,7 @@ export function PropertiesPanel() {
                       <label className="text-[10px] text-zinc-600 block mb-1">{key}</label>
                       <input
                         type="text"
-                        className="w-full bg-zinc-900 text-zinc-200 text-xs rounded-lg px-3 py-2 border border-zinc-800 focus:outline-none"
+                        className="w-full bg-[#171717] text-zinc-200 text-xs rounded-lg px-3 py-2 border border-[#212121] focus:outline-none"
                         value={value}
                         onChange={(e) => updateNodeSetting(selectedNode.id, key, e.target.value)}
                       />
@@ -256,7 +256,7 @@ export function PropertiesPanel() {
 
         {/* Run button for dynamic nodes */}
         {nodeData.behavior === 'dynamic' && (
-          <div className="pt-2 border-t border-zinc-800">
+          <div className="pt-2 border-t border-[#212121]">
             <button
               className="w-full text-xs py-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white transition-colors font-medium"
               onClick={() => {

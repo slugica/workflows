@@ -1,24 +1,25 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, type ReactNode } from 'react';
 import { NODE_TEMPLATES, FlowNodeType } from '@/lib/types';
 import { useFlowStore } from '@/store/flowStore';
+import { Upload, Type, ImageIcon, Video, AudioLines, Bot, Zap, Pencil, Search, Wrench, MessageSquare } from 'lucide-react';
 
 // ── Quick-add buttons (top section) ──────────────────────────────────────────
 
-const QUICK_ADD = [
-  { label: 'Upload', type: 'import' as FlowNodeType, templateLabel: 'Upload', icon: '📁', shortcut: 'U' },
-  { label: 'Prompt', type: 'prompt' as FlowNodeType, templateLabel: 'Prompt', icon: '✏️', shortcut: 'P' },
-  { label: 'Image', type: 'import' as FlowNodeType, templateLabel: 'Image', icon: '🖼️', shortcut: 'I' },
-  { label: 'Video', type: 'import' as FlowNodeType, templateLabel: 'Video', icon: '🎬', shortcut: 'V' },
-  { label: 'AI Copilot', type: 'textUtility' as FlowNodeType, templateLabel: 'AI Copilot', icon: '🤖', shortcut: 'C' },
+const QUICK_ADD: { label: string; type: FlowNodeType; templateLabel: string; icon: ReactNode; shortcut: string }[] = [
+  { label: 'Upload', type: 'import', templateLabel: 'Upload', icon: <Upload size={14} />, shortcut: 'U' },
+  { label: 'Prompt', type: 'prompt', templateLabel: 'Prompt', icon: <Type size={14} />, shortcut: 'P' },
+  { label: 'Image', type: 'import', templateLabel: 'Image', icon: <ImageIcon size={14} />, shortcut: 'I' },
+  { label: 'Video', type: 'import', templateLabel: 'Video', icon: <Video size={14} />, shortcut: 'V' },
+  { label: 'AI Copilot', type: 'textUtility', templateLabel: 'AI Copilot', icon: <Bot size={14} />, shortcut: 'C' },
 ];
 
 // ── Sidebar structure: sections → subcategories → models ─────────────────────
 
 interface SubCategory {
   label: string;
-  icon: string;
+  icon: ReactNode;
   categories: string[]; // maps to NODE_TEMPLATES category values
 }
 
@@ -31,28 +32,28 @@ const SECTIONS: Section[] = [
   {
     label: 'Essentials',
     subs: [
-      { label: 'Essentials', icon: '⚡', categories: ['Essentials'] },
+      { label: 'Essentials', icon: <Zap size={14} />, categories: ['Essentials'] },
     ],
   },
   {
     label: 'Image',
     subs: [
-      { label: 'Generate Image', icon: '🖼️', categories: ['Image Generation'] },
-      { label: 'Edit Image', icon: '✏️', categories: ['Image Editing'] },
-      { label: 'Enhance Image', icon: '🔎', categories: ['Upscale'] },
-      { label: 'Image Utility', icon: '🛠️', categories: ['Utility'] },
+      { label: 'Generate Image', icon: <ImageIcon size={14} />, categories: ['Image Generation'] },
+      { label: 'Edit Image', icon: <Pencil size={14} />, categories: ['Image Editing'] },
+      { label: 'Enhance Image', icon: <Search size={14} />, categories: ['Upscale'] },
+      { label: 'Image Utility', icon: <Wrench size={14} />, categories: ['Utility'] },
     ],
   },
   {
     label: 'Video',
     subs: [
-      { label: 'Generate Video', icon: '🎬', categories: ['Video Generation'] },
+      { label: 'Generate Video', icon: <Video size={14} />, categories: ['Video Generation'] },
     ],
   },
   {
     label: 'Text',
     subs: [
-      { label: 'Text', icon: '💬', categories: ['Text'] },
+      { label: 'Text', icon: <MessageSquare size={14} />, categories: ['Text'] },
     ],
   },
 ];
@@ -91,7 +92,7 @@ export function Sidebar() {
       (t) => t.label.toLowerCase().includes(q) || t.category.toLowerCase().includes(q)
     );
     return (
-      <div className="w-[280px] bg-zinc-950 border-r border-zinc-800 flex flex-col h-full">
+      <div className="w-[280px] bg-[#0F0F0F] border-r border-[#212121] flex flex-col h-full">
         <Header searchQuery={searchQuery} setSearchQuery={setSearchQuery} />
         <div className="flex-1 overflow-y-auto p-2 space-y-0.5">
           {results.map((t) => (
@@ -113,7 +114,7 @@ export function Sidebar() {
   }
 
   return (
-    <div className="w-[280px] bg-zinc-950 border-r border-zinc-800 flex flex-col h-full">
+    <div className="w-[280px] bg-[#0F0F0F] border-r border-[#212121] flex flex-col h-full">
       <Header searchQuery={searchQuery} setSearchQuery={setSearchQuery} />
 
       <div className="flex-1 overflow-y-auto">
@@ -124,10 +125,10 @@ export function Sidebar() {
             {QUICK_ADD.map((item) => (
               <button
                 key={item.label}
-                className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-zinc-800/70 transition-colors text-left group"
+                className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-[#212121]/70 transition-colors text-left group"
                 onClick={() => handleAdd(item.type, item.templateLabel)}
               >
-                <span className="w-8 h-8 rounded-lg bg-zinc-800 flex items-center justify-center text-sm group-hover:bg-zinc-700 transition-colors">
+                <span className="w-8 h-8 rounded-lg bg-[#212121] flex items-center justify-center text-sm group-hover:bg-[#2a2a2a] transition-colors">
                   {item.icon}
                 </span>
                 <span className="text-sm text-zinc-300 flex-1">{item.label}</span>
@@ -166,10 +167,10 @@ export function Sidebar() {
                   return templates.map((t) => (
                     <button
                       key={`${t.type}-${t.label}`}
-                      className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-zinc-800/70 transition-colors text-left group"
+                      className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-[#212121]/70 transition-colors text-left group"
                       onClick={() => handleAdd(t.type, t.label)}
                     >
-                      <span className="w-8 h-8 rounded-lg bg-zinc-800 flex items-center justify-center text-sm group-hover:bg-zinc-700 transition-colors">
+                      <span className="w-8 h-8 rounded-lg bg-[#212121] flex items-center justify-center text-sm group-hover:bg-[#2a2a2a] transition-colors">
                         {sub.icon}
                       </span>
                       <span className="text-sm text-zinc-300 flex-1">{t.label}</span>
@@ -181,12 +182,12 @@ export function Sidebar() {
                   <div key={sub.label}>
                     {/* Subcategory header (accordion toggle) */}
                     <button
-                      className={`w-full flex items-center gap-3 px-4 py-2.5 hover:bg-zinc-800/70 transition-colors text-left group ${
-                        isOpen ? 'bg-zinc-800/50' : ''
+                      className={`w-full flex items-center gap-3 px-4 py-2.5 hover:bg-[#212121]/70 transition-colors text-left group ${
+                        isOpen ? 'bg-[#212121]/50' : ''
                       }`}
                       onClick={() => toggleSub(sub.label)}
                     >
-                      <span className="w-8 h-8 rounded-lg bg-zinc-800 flex items-center justify-center text-sm group-hover:bg-zinc-700 transition-colors">
+                      <span className="w-8 h-8 rounded-lg bg-[#212121] flex items-center justify-center text-sm group-hover:bg-[#2a2a2a] transition-colors">
                         {sub.icon}
                       </span>
                       <span className="text-sm text-zinc-300 flex-1">{sub.label}</span>
@@ -239,7 +240,7 @@ function Header({
   setSearchQuery: (q: string) => void;
 }) {
   return (
-    <div className="p-3 border-b border-zinc-800">
+    <div className="p-3 border-b border-[#212121]">
       <h2 className="text-sm font-semibold text-zinc-200 mb-2">Nodes</h2>
       <div className="relative">
         <svg
@@ -254,7 +255,7 @@ function Header({
         <input
           type="text"
           placeholder="Search nodes or models"
-          className="w-full bg-zinc-900 text-zinc-300 text-xs rounded-lg pl-8 pr-3 py-2 border border-zinc-800 focus:border-zinc-600 focus:outline-none"
+          className="w-full bg-[#171717] text-zinc-300 text-xs rounded-lg pl-8 pr-3 py-2 border border-[#212121] focus:border-[#333] focus:outline-none"
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
         />
@@ -278,13 +279,13 @@ function ModelItem({
 }) {
   return (
     <div
-      className="flex items-center gap-2.5 px-3 py-2 rounded-lg hover:bg-zinc-800/70 cursor-grab active:cursor-grabbing transition-colors group"
+      className="flex items-center gap-2.5 px-3 py-2 rounded-lg hover:bg-[#212121]/70 cursor-grab active:cursor-grabbing transition-colors group"
       draggable
       onDragStart={onDragStart}
       onClick={onAdd}
     >
-      <span className="w-6 h-6 rounded-md bg-zinc-800 flex items-center justify-center text-[11px] group-hover:bg-zinc-700 transition-colors">
-        {type === 'image' ? '🖼️' : type === 'video' ? '🎬' : type === 'audio' ? '🎵' : type === 'prompt' ? '✏️' : type === 'import' ? '📁' : '🤖'}
+      <span className="w-6 h-6 rounded-md bg-[#212121] flex items-center justify-center text-[11px] group-hover:bg-[#2a2a2a] transition-colors">
+        {type === 'image' ? <ImageIcon size={11} /> : type === 'video' ? <Video size={11} /> : type === 'audio' ? <AudioLines size={11} /> : type === 'prompt' ? <Type size={11} /> : type === 'import' ? <Upload size={11} /> : <Bot size={11} />}
       </span>
       <div className="flex-1 min-w-0">
         <div className="text-[13px] text-zinc-300 truncate">{label}</div>

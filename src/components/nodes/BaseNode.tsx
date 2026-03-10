@@ -1,26 +1,27 @@
 'use client';
 
-import { useRef, useCallback } from 'react';
-import { Handle, Position, type NodeProps } from '@xyflow/react';
+import { useRef, useCallback, useMemo, type ReactNode } from 'react';
+import { Handle, Position, useEdges, type NodeProps } from '@xyflow/react';
 import { FlowNodeData, HANDLE_COLORS } from '@/lib/types';
 import { useFlowStore } from '@/store/flowStore';
+import { Upload, Type, ImageIcon, Video, AudioLines, Bot, Play, Loader } from 'lucide-react';
 
-const TYPE_ICONS: Record<string, string> = {
-  import: '📁',
-  prompt: '✏️',
-  image: '🖼️',
-  video: '🎬',
-  audio: '🎵',
-  textUtility: '🤖',
+const TYPE_ICONS: Record<string, ReactNode> = {
+  import: <Upload size={18} />,
+  prompt: <Type size={18} />,
+  image: <ImageIcon size={18} />,
+  video: <Video size={18} />,
+  audio: <AudioLines size={18} />,
+  textUtility: <Bot size={18} />,
 };
 
-const TYPE_COLORS: Record<string, string> = {
-  import: 'border-violet-500/50',
-  prompt: 'border-blue-500/50',
-  image: 'border-emerald-500/50',
-  video: 'border-red-500/50',
-  audio: 'border-amber-500/50',
-  textUtility: 'border-cyan-500/50',
+const TYPE_LABELS: Record<string, string> = {
+  import: 'Import',
+  prompt: 'Prompt',
+  image: 'Image',
+  video: 'Video',
+  audio: 'Audio',
+  textUtility: 'AI Copilot',
 };
 
 export function BaseNode(props: NodeProps) {
@@ -29,17 +30,24 @@ export function BaseNode(props: NodeProps) {
   const selectNode = useFlowStore((s) => s.selectNode);
   const nodeType: string = String(props.type || 'import');
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const edges = useEdges();
+  const connectedHandles = useMemo(() => {
+    const set = new Set<string>();
+    for (const e of edges) {
+      if (e.source === id && e.sourceHandle) set.add(e.sourceHandle);
+      if (e.target === id && e.targetHandle) set.add(e.targetHandle);
+    }
+    return set;
+  }, [edges, id]);
 
   const handleFileSelect = useCallback(async (file: File) => {
     const store = useFlowStore.getState();
-    // Show local preview immediately
     const localUrl = URL.createObjectURL(file);
     store.updateNodeSetting(id, 'fileName', file.name);
     store.updateNodeSetting(id, 'fileUrl', localUrl);
     store.updateNodeSetting(id, 'fileType', file.type);
     store.updateNodeSetting(id, 'uploading', true);
 
-    // Upload to fal.ai storage via our API route
     try {
       const formData = new FormData();
       formData.append('file', file);
@@ -57,84 +65,129 @@ export function BaseNode(props: NodeProps) {
     }
   }, [id]);
 
-  const statusColor =
-    data.status === 'running'
-      ? 'ring-2 ring-yellow-400 animate-pulse'
-      : data.status === 'done'
-        ? 'ring-2 ring-green-400'
-        : data.status === 'error'
-          ? 'ring-2 ring-red-400'
-          : '';
-
   return (
     <div
-      className={`
-        bg-zinc-900 rounded-xl border-2 ${TYPE_COLORS[nodeType] || 'border-zinc-700'}
-        ${selected ? 'ring-2 ring-white/30' : ''}
-        ${statusColor}
-        min-w-[220px] max-w-[280px] shadow-xl
-      `}
+      className="group relative flex flex-col items-center gap-1 w-[356px]"
       onClick={() => selectNode(id)}
     >
-      {/* Header */}
-      <div className="flex items-center gap-2 px-3 py-2 border-b border-zinc-800">
-        <span className="text-sm">{TYPE_ICONS[nodeType] || '📦'}</span>
-        <h3 className="text-xs font-semibold text-zinc-200 truncate flex-1">
-          {data.name}
-        </h3>
-        {data.behavior === 'dynamic' ? (
-          <span className="text-[10px] px-1.5 py-0.5 rounded bg-zinc-800 text-zinc-400">
-            AI
+      {/* Top info bar - above the card */}
+      <div className="absolute bottom-full left-0 mb-1 flex w-full flex-row items-center justify-between gap-2 px-1">
+        <div className="flex items-center justify-center p-0.5">
+          <input
+            className="text-[12px] text-zinc-400 bg-transparent border-none outline-none max-w-[180px] truncate nodrag"
+            defaultValue={data.name}
+            onChange={(e) => {
+              useFlowStore.getState().updateNodeData(id, { name: e.target.value });
+            }}
+          />
+        </div>
+        {data.settings.modelId ? (
+          <span className="text-[11px] text-white/50">
+            {String(data.settings.modelId).split('/').pop()}
           </span>
         ) : null}
       </div>
 
-      {/* Body */}
-      <div className="px-3 py-2">
-        {/* Inputs */}
-        {data.handles.inputs.map((handle, i) => (
-          <div key={handle.id || i} className="relative flex items-center gap-2 py-1">
-            <Handle
-              type="target"
-              position={Position.Left}
-              id={handle.id}
-              className="!w-3 !h-3 !rounded-full !border-2 !-left-[7px]"
-              style={{
-                backgroundColor: HANDLE_COLORS[handle.type],
-                borderColor: HANDLE_COLORS[handle.type],
-              }}
-            />
-            <span className="text-[11px] text-zinc-400">{handle.label}</span>
-            <span
-              className="text-[9px] px-1 rounded"
-              style={{ color: HANDLE_COLORS[handle.type], opacity: 0.7 }}
-            >
-              {handle.type}
+      {/* Card */}
+      <div
+        className={`
+          bg-[#171717] rounded-[24px] border-2 border-[#212121] relative flex flex-col items-start
+          p-4 pt-3 w-full
+          drop-shadow-sm group-hover:drop-shadow-md
+          ${selected ? 'border-white/30 show-labels' : ''}
+          ${data.status === 'running' ? 'border-yellow-400/50' : ''}
+          ${data.status === 'error' ? 'border-red-400/50' : ''}
+        `}
+      >
+        {/* Header */}
+        <header className="mb-2 flex h-7 items-center justify-between gap-2 self-stretch">
+          <span className="text-white">{TYPE_ICONS[nodeType] || <ImageIcon size={18} />}</span>
+          <h3 className="text-base font-medium text-white line-clamp-1 flex-1 text-ellipsis overflow-hidden">
+            {TYPE_LABELS[nodeType] || nodeType}
+          </h3>
+          {data.behavior === 'dynamic' ? (
+            <span className="text-[10px] px-1.5 py-0.5 rounded bg-[#212121] text-zinc-400">
+              AI
             </span>
-          </div>
-        ))}
+          ) : null}
+        </header>
 
-        {/* Node-specific content */}
-        {nodeType === 'prompt' ? (
-          <div className="mt-1 mb-1">
-            <textarea
-              className="w-full bg-zinc-800 text-zinc-200 text-xs rounded-lg p-2 resize-none border border-zinc-700 focus:border-blue-500 focus:outline-none nodrag nowheel"
-              rows={3}
-              placeholder="Enter your prompt..."
-              defaultValue={(data.settings.promptText as string) || ''}
-              onChange={(e) => {
-                useFlowStore.getState().updateNodeSetting(id, 'promptText', e.target.value);
-              }}
-            />
+        {/* Handle containers - positioned absolutely on the card sides */}
+        {data.handles.inputs.length > 0 && (
+          <div className="pointer-events-none absolute top-[68px] -left-[10px] flex flex-col items-center justify-center gap-6">
+            {data.handles.inputs.map((handle, i) => {
+              const isConnected = connectedHandles.has(handle.id);
+              return (
+                <Handle
+                  key={handle.id || i}
+                  type="target"
+                  position={Position.Left}
+                  id={handle.id}
+                  className="!relative !transform-none !w-[18px] !h-[18px] !rounded-full !border-2 !left-0 !top-0 !flex !items-center !justify-center"
+                  style={{
+                    backgroundColor: isConnected ? HANDLE_COLORS[handle.type] : '#171717',
+                    borderColor: HANDLE_COLORS[handle.type],
+                  }}
+                >
+                  <span
+                    className="handle-label absolute top-[-20px] right-[14px] whitespace-nowrap text-sm font-medium opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none"
+                    style={{ color: HANDLE_COLORS[handle.type] }}
+                  >
+                    {handle.label}
+                  </span>
+                </Handle>
+              );
+            })}
           </div>
+        )}
+
+        {data.handles.outputs.length > 0 && (
+          <div className="pointer-events-none absolute top-[68px] -right-[10px] flex flex-col items-center justify-center gap-6">
+            {data.handles.outputs.map((handle, i) => {
+              const isConnected = connectedHandles.has(handle.id);
+              return (
+                <Handle
+                  key={handle.id || i}
+                  type="source"
+                  position={Position.Right}
+                  id={handle.id}
+                  className="!relative !transform-none !w-[18px] !h-[18px] !rounded-full !border-2 !left-0 !top-0 !flex !items-center !justify-center"
+                  style={{
+                    backgroundColor: isConnected ? HANDLE_COLORS[handle.type] : '#171717',
+                    borderColor: HANDLE_COLORS[handle.type],
+                  }}
+                >
+                  <span
+                    className="handle-label absolute top-[-20px] left-[24px] whitespace-nowrap text-sm font-medium opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none"
+                    style={{ color: HANDLE_COLORS[handle.type] }}
+                  >
+                    {handle.label}
+                  </span>
+                </Handle>
+              );
+            })}
+          </div>
+        )}
+
+        {/* Content area */}
+        {nodeType === 'prompt' ? (
+          <textarea
+            className="w-full min-h-[172px] bg-[#212121] rounded-xl text-white text-base leading-6 p-3 resize-none border-none focus:outline-none focus:ring-0 nodrag nowheel nopan self-stretch"
+            placeholder="Enter your prompt here..."
+            defaultValue={(data.settings.promptText as string) || ''}
+            onChange={(e) => {
+              useFlowStore.getState().updateNodeSetting(id, 'promptText', e.target.value);
+            }}
+          />
         ) : null}
 
         {nodeType === 'import' ? (
-          <div className="mt-1 mb-1">
+          <div className="self-stretch">
             <input
               ref={fileInputRef}
+              id={`file-input-${id}`}
               type="file"
-              className="hidden"
+              className="absolute w-0 h-0 opacity-0 overflow-hidden"
               accept={(data.settings.allowedFileTypes as string[] | undefined)?.join(',') || '*'}
               onChange={(e) => {
                 const file = e.target.files?.[0];
@@ -142,49 +195,29 @@ export function BaseNode(props: NodeProps) {
               }}
             />
             {data.settings.fileUrl ? (
-              <div className="relative group">
+              <div className="relative bg-[#212121] rounded-2xl overflow-hidden">
                 {(data.settings.fileType as string)?.startsWith('video/') ? (
                   <video
                     src={data.settings.fileUrl as string}
-                    className="w-full rounded-lg max-h-[120px] object-cover"
+                    className="w-full max-h-[400px] object-cover"
                     muted
                   />
                 ) : (
                   <img
                     src={data.settings.fileUrl as string}
                     alt={data.settings.fileName as string}
-                    className="w-full rounded-lg max-h-[120px] object-cover"
+                    className="w-full max-h-[400px] object-cover"
                   />
                 )}
-                <div className="text-[10px] text-zinc-400 mt-1 truncate flex items-center gap-1">
-                  {data.settings.uploading ? (
-                    <span className="text-yellow-400">Uploading...</span>
-                  ) : data.settings.remoteUrl ? (
-                    <span className="text-green-400">✓</span>
-                  ) : null}
-                  {data.settings.fileName as string}
-                </div>
-                <button
-                  className="absolute top-1 right-1 w-5 h-5 rounded-full bg-zinc-900/80 text-zinc-400 hover:text-white text-xs opacity-0 group-hover:opacity-100 transition-opacity nodrag"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    fileInputRef.current?.click();
-                  }}
-                >
-                  ×
-                </button>
+                {data.settings.uploading ? (
+                  <div className="absolute bottom-2 left-2 text-[10px] text-yellow-400">Uploading...</div>
+                ) : null}
               </div>
             ) : (
-              <div
-                className="border-2 border-dashed border-zinc-700 rounded-lg p-3 text-center cursor-pointer hover:border-zinc-500 transition-colors nodrag"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  fileInputRef.current?.click();
-                }}
-                onDragOver={(e) => {
-                  e.preventDefault();
-                  e.stopPropagation();
-                }}
+              <label
+                htmlFor={`file-input-${id}`}
+                className="bg-[#212121] rounded-2xl p-8 text-center cursor-pointer hover:bg-[#292929] transition-colors nodrag block"
+                onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); }}
                 onDrop={(e) => {
                   e.preventDefault();
                   e.stopPropagation();
@@ -192,60 +225,53 @@ export function BaseNode(props: NodeProps) {
                   if (file) handleFileSelect(file);
                 }}
               >
-                <span className="text-zinc-500 text-xs">Drop file or click</span>
-              </div>
+                <span className="text-zinc-500 text-sm">Drop file or click to upload</span>
+              </label>
             )}
-          </div>
-        ) : null}
-
-        {nodeType === 'image' && data.settings.modelId ? (
-          <div className="mt-1 mb-1 flex items-center gap-1">
-            <span className="text-[10px] text-zinc-500">Model:</span>
-            <span className="text-[10px] text-zinc-300">
-              {String(data.settings.modelId)}
-            </span>
           </div>
         ) : null}
 
         {/* Status */}
         {data.status === 'running' ? (
-          <div className="mt-1 flex items-center gap-1">
+          <div className="mt-2 flex items-center gap-1">
             <div className="w-2 h-2 rounded-full bg-yellow-400 animate-pulse" />
             <span className="text-[10px] text-yellow-400">Processing...</span>
           </div>
         ) : null}
         {data.status === 'error' && data.errorMessage ? (
-          <div className="mt-1 text-[10px] text-red-400 truncate" title={data.errorMessage}>{data.errorMessage}</div>
+          <div className="mt-2 text-[10px] text-red-400 truncate self-stretch" title={data.errorMessage}>{data.errorMessage}</div>
         ) : null}
 
         {/* Result preview */}
         {data.results && data.results.length > 0 ? (
-          <div className="mt-1 mb-1">
-            {(() => {
-              const result = data.results[data.selectedResultIndex || 0];
-              if (!result) return null;
-              const entry = Object.values(result)[0];
-              if (!entry?.content) return null;
-              if (entry.format === 'video') {
+          <div className="self-stretch">
+            <div className="bg-[#212121] rounded-2xl overflow-hidden">
+              {(() => {
+                const result = data.results[data.selectedResultIndex || 0];
+                if (!result) return null;
+                const entry = Object.values(result)[0];
+                if (!entry?.content) return null;
+                if (entry.format === 'video') {
+                  return (
+                    <video
+                      src={entry.content}
+                      className="w-full max-h-[400px] object-cover"
+                      controls
+                      muted
+                    />
+                  );
+                }
                 return (
-                  <video
+                  <img
                     src={entry.content}
-                    className="w-full rounded-lg max-h-[140px] object-cover"
-                    controls
-                    muted
+                    alt="Result"
+                    className="w-full max-h-[400px] object-cover"
                   />
                 );
-              }
-              return (
-                <img
-                  src={entry.content}
-                  alt="Result"
-                  className="w-full rounded-lg max-h-[140px] object-cover"
-                />
-              );
-            })()}
+              })()}
+            </div>
             {data.results.length > 1 ? (
-              <div className="flex items-center justify-center gap-1 mt-1">
+              <div className="flex items-center justify-center gap-1 mt-2">
                 {data.results.map((_, i) => (
                   <button
                     key={i}
@@ -261,52 +287,26 @@ export function BaseNode(props: NodeProps) {
           </div>
         ) : null}
 
-        {/* Outputs */}
-        {data.handles.outputs.map((handle, i) => (
-          <div
-            key={handle.id || i}
-            className="relative flex items-center justify-end gap-2 py-1"
-          >
-            <span
-              className="text-[9px] px-1 rounded"
-              style={{ color: HANDLE_COLORS[handle.type], opacity: 0.7 }}
-            >
-              {handle.type}
-            </span>
-            <span className="text-[11px] text-zinc-400">{handle.label}</span>
-            <Handle
-              type="source"
-              position={Position.Right}
-              id={handle.id}
-              className="!w-3 !h-3 !rounded-full !border-2 !-right-[7px]"
-              style={{
-                backgroundColor: HANDLE_COLORS[handle.type],
-                borderColor: HANDLE_COLORS[handle.type],
+        {/* Footer with run button */}
+        {data.behavior === 'dynamic' ? (
+          <div className="mt-3 flex items-start justify-end gap-2 self-stretch">
+            <button
+              className={`h-10 px-3 text-base font-medium rounded-2xl nodrag flex items-center justify-center gap-2 transition-colors duration-300 ${
+                data.status === 'running'
+                  ? 'bg-yellow-900/50 text-yellow-400 cursor-wait border border-yellow-700/50'
+                  : 'bg-transparent hover:bg-[#212121] text-white border border-[#292929]'
+              }`}
+              disabled={data.status === 'running'}
+              onClick={(e) => {
+                e.stopPropagation();
+                useFlowStore.getState().runNode(id);
               }}
-            />
+            >
+              {data.status === 'running' ? <><Loader size={16} className="animate-spin" /> Running...</> : <><Play size={16} /> Run</>}
+            </button>
           </div>
-        ))}
+        ) : null}
       </div>
-
-      {/* Footer with run button for dynamic nodes */}
-      {data.behavior === 'dynamic' ? (
-        <div className="px-3 py-2 border-t border-zinc-800">
-          <button
-            className={`w-full text-xs py-1.5 rounded-lg transition-colors nodrag ${
-              data.status === 'running'
-                ? 'bg-yellow-900/50 text-yellow-400 cursor-wait'
-                : 'bg-zinc-800 hover:bg-zinc-700 text-zinc-300'
-            }`}
-            disabled={data.status === 'running'}
-            onClick={(e) => {
-              e.stopPropagation();
-              useFlowStore.getState().runNode(id);
-            }}
-          >
-            {data.status === 'running' ? '⏳ Running...' : '▶ Run'}
-          </button>
-        </div>
-      ) : null}
     </div>
   );
 }

@@ -46,10 +46,10 @@ export interface NodeTemplate {
 }
 
 export const HANDLE_COLORS: Record<HandleDataType, string> = {
-  image: '#8b5cf6',
-  text: '#3b82f6',
-  video: '#ef4444',
-  audio: '#f59e0b',
+  image: '#FCB84A',
+  text: '#3CB8FF',
+  video: '#4ADE80',
+  audio: '#F472B6',
 };
 
 import { MODEL_REGISTRY, getDefaultSettings } from './modelRegistry';

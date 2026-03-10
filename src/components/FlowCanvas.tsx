@@ -10,11 +10,28 @@ import {
   type NodeTypes,
   type IsValidConnection,
   type Node,
+  type ConnectionLineComponentProps,
+  getSmoothStepPath,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 import { useFlowStore } from '@/store/flowStore';
 import { BaseNode } from '@/components/nodes/BaseNode';
-import { FlowNodeType } from '@/lib/types';
+import { FlowNodeType, HANDLE_COLORS, type FlowNodeData } from '@/lib/types';
+
+function CustomConnectionLine({ fromX, fromY, toX, toY, fromNode, fromHandle }: ConnectionLineComponentProps) {
+  const handleId = fromHandle?.id || '';
+  const nodeData = fromNode?.data as unknown as FlowNodeData | undefined;
+  const handle = nodeData?.handles.outputs.find(h => h.id === handleId)
+    || nodeData?.handles.inputs.find(h => h.id === handleId);
+  const color = handle ? HANDLE_COLORS[handle.type] : '#52525b';
+
+  const [path] = getSmoothStepPath({
+    sourceX: fromX, sourceY: fromY,
+    targetX: toX, targetY: toY,
+  });
+
+  return <path d={path} fill="none" stroke={color} strokeWidth={2} />;
+}
 
 const nodeTypes: NodeTypes = {
   import: BaseNode,
@@ -119,20 +136,20 @@ export function FlowCanvas() {
         colorMode="dark"
         defaultEdgeOptions={{
           type: 'smoothstep',
-          animated: true,
-          style: { stroke: '#52525b', strokeWidth: 2 },
+          animated: false,
+          style: { strokeWidth: 2 },
         }}
-        connectionLineStyle={{ stroke: '#a1a1aa', strokeWidth: 2 }}
+        connectionLineComponent={CustomConnectionLine}
         proOptions={{ hideAttribution: true }}
       >
-        <Background variant={BackgroundVariant.Dots} gap={20} size={1} color="#27272a" />
+        <Background variant={BackgroundVariant.Dots} gap={12} size={0.5} color="rgba(255,255,255,0.25)" />
         <Controls
-          className="!bg-zinc-900 !border-zinc-700 !rounded-lg !shadow-xl"
+          className="!bg-[#171717] !border-[#212121] !rounded-lg !shadow-xl"
           showInteractive={false}
         />
         <MiniMap
-          className="!bg-zinc-900 !border-zinc-700 !rounded-lg"
-          nodeColor="#3f3f46"
+          className="!bg-[#171717] !border-[#212121] !rounded-lg"
+          nodeColor="#212121"
           maskColor="rgba(0, 0, 0, 0.6)"
         />
       </ReactFlow>

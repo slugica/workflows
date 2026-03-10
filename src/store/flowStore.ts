@@ -10,7 +10,7 @@ import {
   Connection,
   addEdge,
 } from '@xyflow/react';
-import { FlowNodeData, FlowNodeType, NODE_TEMPLATES, HandleDef } from '@/lib/types';
+import { FlowNodeData, FlowNodeType, NODE_TEMPLATES, HandleDef, HANDLE_COLORS, HandleDataType } from '@/lib/types';
 import { executeNode } from '@/lib/executeNode';
 
 interface FlowState {
@@ -115,10 +115,12 @@ export const useFlowStore = create<FlowState>((set, get) => ({
     const existingEdgeToHandle = get().edges.find((e) => e.targetHandle === targetHandle);
     if (existingEdgeToHandle) return;
 
+    const edgeColor = HANDLE_COLORS[sourceType as HandleDataType] || '#52525b';
     const newEdge: Edge = {
       ...connection,
       id: `${connection.source}-${connection.target}-${generateId()}`,
       type: 'smoothstep',
+      style: { stroke: edgeColor, strokeWidth: 2 },
     };
     const newEdges = addEdge(newEdge, get().edges);
 

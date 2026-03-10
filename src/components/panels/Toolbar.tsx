@@ -75,10 +75,10 @@ export function Toolbar() {
   };
 
   return (
-    <div className="h-12 bg-zinc-950 border-b border-zinc-800 flex items-center justify-between px-4">
+    <div className="h-12 bg-[#0F0F0F] border-b border-[#212121] flex items-center justify-between px-4">
       <div className="flex items-center gap-3">
         <h1 className="text-sm font-bold text-zinc-200">Flow Editor</h1>
-        <span className="text-[10px] text-zinc-600 bg-zinc-800 px-2 py-0.5 rounded">
+        <span className="text-[10px] text-zinc-600 bg-[#212121] px-2 py-0.5 rounded">
           prototype
         </span>
       </div>
@@ -93,19 +93,19 @@ export function Toolbar() {
         />
         <button
           onClick={handleNew}
-          className="text-xs px-3 py-1.5 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-300 transition-colors"
+          className="text-xs px-3 py-1.5 rounded-lg bg-[#212121] hover:bg-[#2a2a2a] text-zinc-300 transition-colors"
         >
           New
         </button>
         <button
           onClick={handleImport}
-          className="text-xs px-3 py-1.5 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-300 transition-colors"
+          className="text-xs px-3 py-1.5 rounded-lg bg-[#212121] hover:bg-[#2a2a2a] text-zinc-300 transition-colors"
         >
           Import
         </button>
         <button
           onClick={handleExport}
-          className="text-xs px-3 py-1.5 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-300 transition-colors"
+          className="text-xs px-3 py-1.5 rounded-lg bg-[#212121] hover:bg-[#2a2a2a] text-zinc-300 transition-colors"
         >
           Export
         </button>
