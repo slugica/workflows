@@ -40,6 +40,12 @@ export function BaseNode(props: NodeProps) {
     return set;
   }, [edges, id]);
 
+  const missingRequiredInputs = useMemo(() => {
+    return data.handles.inputs
+      .filter((h) => h.required && !connectedHandles.has(h.id))
+      .map((h) => h.label);
+  }, [data.handles.inputs, connectedHandles]);
+
   const handleFileSelect = useCallback(async (file: File) => {
     const store = useFlowStore.getState();
     const localUrl = URL.createObjectURL(file);
@@ -242,7 +248,10 @@ export function BaseNode(props: NodeProps) {
           <div className="mt-2 text-[10px] text-red-400 truncate self-stretch" title={data.errorMessage}>{data.errorMessage}</div>
         ) : null}
 
-        {/* Result preview */}
+        {/* Result placeholder or preview */}
+        {data.behavior === 'dynamic' && (!data.results || data.results.length === 0) ? (
+          <div className="self-stretch bg-[#212121] rounded-2xl overflow-hidden h-[320px] checkerboard" />
+        ) : null}
         {data.results && data.results.length > 0 ? (
           <div className="self-stretch">
             <div className="bg-[#212121] rounded-2xl overflow-hidden">
@@ -294,9 +303,11 @@ export function BaseNode(props: NodeProps) {
               className={`h-10 px-3 text-base font-medium rounded-2xl nodrag flex items-center justify-center gap-2 transition-colors duration-300 ${
                 data.status === 'running'
                   ? 'bg-yellow-900/50 text-yellow-400 cursor-wait border border-yellow-700/50'
-                  : 'bg-transparent hover:bg-[#212121] text-white border border-[#292929]'
+                  : missingRequiredInputs.length > 0
+                    ? 'bg-transparent text-zinc-600 border border-[#212121] cursor-not-allowed'
+                    : 'bg-transparent hover:bg-[#212121] text-white border border-[#292929]'
               }`}
-              disabled={data.status === 'running'}
+              disabled={data.status === 'running' || missingRequiredInputs.length > 0}
               onClick={(e) => {
                 e.stopPropagation();
                 useFlowStore.getState().runNode(id);

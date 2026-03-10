@@ -39,8 +39,6 @@ export async function POST(req: NextRequest) {
     : `${TUNETANK_BASE}/images/generate`;
 
   try {
-    console.log(`[generate] POST ${endpoint} | model: ${model}`);
-
     const res = await fetch(endpoint, {
       method: 'POST',
       headers: {
@@ -51,7 +49,6 @@ export async function POST(req: NextRequest) {
     });
 
     const { ok, status, data, text } = await safeParseResponse(res);
-    console.log(`[generate] response: ${status} — ${text.slice(0, 300)}`);
 
     if (!ok) {
       const errMsg = data && typeof data === 'object'

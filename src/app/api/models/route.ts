@@ -4,7 +4,6 @@ const TUNETANK_BASE = 'https://api.tunetank.com/v1/models';
 
 export async function GET() {
   const token = process.env.TUNETANK_TOKEN;
-  console.log('[/api/models] TUNETANK_TOKEN present:', !!token, 'length:', token?.length);
 
   if (!token) {
     return NextResponse.json(
@@ -18,13 +17,10 @@ export async function GET() {
   };
 
   try {
-    console.log('[/api/models] Fetching:', `${TUNETANK_BASE}/image`);
     const [imageRes, videoRes] = await Promise.all([
       fetch(`${TUNETANK_BASE}/image`, { headers, cache: 'no-store' }),
       fetch(`${TUNETANK_BASE}/video`, { headers, cache: 'no-store' }),
     ]);
-
-    console.log('[/api/models] image status:', imageRes.status, 'video status:', videoRes.status);
 
     if (!imageRes.ok || !videoRes.ok) {
       const errText = !imageRes.ok
@@ -42,7 +38,6 @@ export async function GET() {
       videoRes.json(),
     ]);
 
-    console.log('[/api/models] OK — image:', imageModels.length, 'video:', videoModels.length);
     return NextResponse.json({ image: imageModels, video: videoModels });
   } catch (err) {
     console.error('[/api/models] Exception:', err);

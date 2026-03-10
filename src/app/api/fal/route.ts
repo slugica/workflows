@@ -32,15 +32,8 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    console.log('=== FAL REQUEST ===');
-    console.log('Model:', modelId);
-    console.log('Input:', JSON.stringify(input, null, 2));
-
     // Use fal.subscribe which handles queue + polling automatically
     const result = await fal.subscribe(modelId, { input });
-
-    console.log('=== FAL RESULT ===');
-    console.log(JSON.stringify(result.data, null, 2).slice(0, 500));
 
     return NextResponse.json({ result: result.data });
   } catch (err) {

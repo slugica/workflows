@@ -260,10 +260,7 @@ export function PropertiesPanel() {
             <button
               className="w-full text-xs py-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white transition-colors font-medium"
               onClick={() => {
-                updateNodeData(selectedNode.id, { status: 'running' });
-                setTimeout(() => {
-                  updateNodeData(selectedNode.id, { status: 'done' });
-                }, 2000);
+                useFlowStore.getState().runNode(selectedNode.id);
               }}
             >
               ▶ Run Node

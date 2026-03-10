@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, type ReactNode } from 'react';
+import { useReactFlow } from '@xyflow/react';
 import { NODE_TEMPLATES, FlowNodeType } from '@/lib/types';
 import { useFlowStore } from '@/store/flowStore';
 import { Upload, Type, ImageIcon, Video, AudioLines, Bot, Zap, Pencil, Search, Wrench, MessageSquare } from 'lucide-react';
@@ -62,6 +63,7 @@ export function Sidebar() {
   const [searchQuery, setSearchQuery] = useState('');
   const [openSubs, setOpenSubs] = useState<Set<string>>(new Set());
   const addNode = useFlowStore((s) => s.addNode);
+  const { screenToFlowPosition } = useReactFlow();
 
   const toggleSub = (label: string) => {
     setOpenSubs((prev) => {
@@ -79,9 +81,13 @@ export function Sidebar() {
   };
 
   const handleAdd = (type: FlowNodeType, label: string) => {
+    const center = screenToFlowPosition({
+      x: window.innerWidth / 2,
+      y: window.innerHeight / 2,
+    });
     addNode(type, label, {
-      x: 300 + Math.random() * 200,
-      y: 200 + Math.random() * 200,
+      x: center.x + (Math.random() - 0.5) * 100,
+      y: center.y + (Math.random() - 0.5) * 100,
     });
   };
 
