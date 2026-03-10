@@ -25,6 +25,7 @@ import { CropNode } from '@/components/nodes/CropNode';
 import { ExportNode } from '@/components/nodes/ExportNode';
 import { PreviewNode } from '@/components/nodes/PreviewNode';
 import { BlurNode } from '@/components/nodes/BlurNode';
+import { ResizeNode } from '@/components/nodes/ResizeNode';
 import { FlowNodeType, HANDLE_COLORS, type FlowNodeData } from '@/lib/types';
 
 function CustomConnectionLine({ fromX, fromY, toX, toY, fromNode, fromHandle }: ConnectionLineComponentProps) {
@@ -53,6 +54,7 @@ const nodeTypes: NodeTypes = {
   export: ExportNode,
   preview: PreviewNode,
   blur: BlurNode,
+  resize: ResizeNode,
 };
 
 function parseHandleInfo(handleId: string): { direction: string; type: string; key: string } | null {
