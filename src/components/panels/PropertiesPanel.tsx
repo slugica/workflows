@@ -4,7 +4,7 @@ import { useRef, useState, useCallback } from 'react';
 import { useFlowStore } from '@/store/flowStore';
 import { FlowNodeData } from '@/lib/types';
 import { getModelById, type SettingDef } from '@/lib/modelRegistry';
-import { Sun } from 'lucide-react';
+import { Sun, Camera } from 'lucide-react';
 
 function SettingControl({
   def,
@@ -96,6 +96,21 @@ function SettingControl({
     default:
       return null;
   }
+}
+
+/* ─── Aspect ratio preview helper ─── */
+function addAspectRatioPreview(nodeId: string, newRatio: string) {
+  const store = useFlowStore.getState();
+  store.updateNodeSetting(nodeId, 'aspectRatio', newRatio);
+  const currentData = store.nodes.find(n => n.id === nodeId)?.data as unknown as FlowNodeData;
+  const results = currentData?.results || [];
+  const cleaned = results.filter(r => Object.values(r)[0]?.format !== 'preview');
+  const preview = { image: { content: '', format: 'preview', aspectRatio: newRatio } };
+  store.updateNodeData(nodeId, {
+    results: [...cleaned, preview],
+    selectedResultIndex: cleaned.length,
+    status: cleaned.length > 0 ? 'done' : 'idle',
+  });
 }
 
 /* ─── 3D Sphere projection ─── */
@@ -470,12 +485,358 @@ function RelightProperties({ nodeId, settings }: { nodeId: string; settings: Rec
         <select
           className="w-full bg-[#171717] text-zinc-200 text-xs rounded-lg px-3 py-2 border border-[#212121] focus:outline-none"
           value={aspectRatio}
-          onChange={(e) => updateNodeSetting(nodeId, 'aspectRatio', e.target.value)}
+          onChange={(e) => addAspectRatioPreview(nodeId, e.target.value)}
         >
           {ASPECT_RATIOS.map((r) => (
             <option key={r} value={r}>{r}</option>
           ))}
         </select>
+      </div>
+
+      {/* Resolution */}
+      <div>
+        <label className="text-[11px] text-zinc-500 block mb-1">Resolution</label>
+        <select
+          className="w-full bg-[#171717] text-zinc-200 text-xs rounded-lg px-3 py-2 border border-[#212121] focus:outline-none"
+          value={resolution}
+          onChange={(e) => updateNodeSetting(nodeId, 'resolution', e.target.value)}
+        >
+          {RESOLUTIONS.map((r) => (
+            <option key={r} value={r}>{r}</option>
+          ))}
+        </select>
+      </div>
+    </div>
+  );
+}
+
+/* ─── Camera Angle Presets ─── */
+interface CameraPreset {
+  label: string;
+  azimuth: number;
+  elevation: number;
+  zoom: number;
+}
+
+const CAMERA_PRESETS: CameraPreset[] = [
+  { label: 'Top',    azimuth: 0,   elevation: 90,  zoom: 1 },
+  { label: 'Front',  azimuth: 0,   elevation: 0,   zoom: 1 },
+  { label: 'Back',   azimuth: 180, elevation: 0,   zoom: 1 },
+  { label: 'Bottom', azimuth: 0,   elevation: -90, zoom: 1 },
+  { label: 'Left',   azimuth: 270, elevation: 0,   zoom: 1 },
+  { label: 'Right',  azimuth: 90,  elevation: 0,   zoom: 1 },
+];
+
+/* ─── Camera Angles Properties Section ─── */
+function CameraAnglesProperties({ nodeId, settings }: { nodeId: string; settings: Record<string, unknown> }) {
+  const updateNodeSetting = useFlowStore((s) => s.updateNodeSetting);
+
+  const azimuth = (settings.rotateRightLeft as number) ?? 0;
+  const elevation = (settings.verticalAngle as number) ?? 0;
+  const zoom = (settings.moveForward as number) ?? 5;
+  const aspectRatio = (settings.aspectRatio as string) ?? '3:4';
+  const resolution = (settings.resolution as string) ?? '1K';
+  const guidanceScale = (settings.guidanceScale as number) ?? 4.5;
+  const wideAngleLens = (settings.wideAngleLens as boolean) ?? false;
+  const enableSafetyChecker = (settings.enableSafetyChecker as boolean) ?? false;
+  const seed = settings.seed as number | undefined;
+
+  const SPHERE_SIZE = 250;
+  const SPHERE_R = 100;
+  const CENTER = SPHERE_SIZE / 2;
+
+  const svgRef = useRef<SVGSVGElement>(null);
+  const [dragging, setDragging] = useState<'azimuth' | 'elevation' | null>(null);
+
+  const longitudeLines = [];
+  for (let a = 0; a < 360; a += 20) {
+    const points: string[] = [];
+    for (let el = -90; el <= 90; el += 5) {
+      const p = projectPoint(a, el, SPHERE_R, CENTER);
+      points.push(`${p.x.toFixed(1)},${p.y.toFixed(1)}`);
+    }
+    longitudeLines.push(points.join(' '));
+  }
+
+  const equatorPoints: { x: number; y: number }[] = [];
+  for (let a = 0; a <= 360; a += 2) {
+    const p = projectPoint(a, 0, SPHERE_R, CENTER);
+    equatorPoints.push({ x: p.x, y: p.y });
+  }
+  const equatorPath = equatorPoints.map((p, i) => `${i === 0 ? 'M' : 'L'}${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' ');
+
+  const meridianPoints: { x: number; y: number }[] = [];
+  for (let el = -90; el <= 90; el += 2) {
+    const p = projectPoint(azimuth, el, SPHERE_R, CENTER);
+    meridianPoints.push({ x: p.x, y: p.y });
+  }
+  const meridianPath = meridianPoints.map((p, i) => `${i === 0 ? 'M' : 'L'}${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' ');
+
+  const cameraPoint = projectPoint(azimuth, elevation, SPHERE_R, CENTER);
+  const azHandle = projectPoint(azimuth, 0, SPHERE_R, CENTER);
+
+  const findClosestAzimuth = useCallback((mx: number, my: number) => {
+    let bestAz = 0;
+    let bestDist = Infinity;
+    for (let a = 0; a < 360; a += 2) {
+      const p = projectPoint(a, 0, SPHERE_R, CENTER);
+      const d = (p.x - mx) ** 2 + (p.y - my) ** 2;
+      if (d < bestDist) { bestDist = d; bestAz = a; }
+    }
+    for (let a = bestAz - 2; a <= bestAz + 2; a += 0.5) {
+      const na = ((a % 360) + 360) % 360;
+      const p = projectPoint(na, 0, SPHERE_R, CENTER);
+      const d = (p.x - mx) ** 2 + (p.y - my) ** 2;
+      if (d < bestDist) { bestDist = d; bestAz = na; }
+    }
+    return Math.round(bestAz);
+  }, []);
+
+  const findClosestElevation = useCallback((mx: number, my: number, currentAz: number) => {
+    let bestEl = 0;
+    let bestDist = Infinity;
+    for (let el = -90; el <= 90; el += 2) {
+      const p = projectPoint(currentAz, el, SPHERE_R, CENTER);
+      const d = (p.x - mx) ** 2 + (p.y - my) ** 2;
+      if (d < bestDist) { bestDist = d; bestEl = el; }
+    }
+    for (let el = bestEl - 2; el <= bestEl + 2; el += 0.5) {
+      const clamped = Math.max(-30, Math.min(90, el));
+      const p = projectPoint(currentAz, clamped, SPHERE_R, CENTER);
+      const d = (p.x - mx) ** 2 + (p.y - my) ** 2;
+      if (d < bestDist) { bestDist = d; bestEl = clamped; }
+    }
+    return Math.round(bestEl);
+  }, []);
+
+  const handleMouseMove = useCallback((e: React.MouseEvent) => {
+    if (!dragging || !svgRef.current) return;
+    const rect = svgRef.current.getBoundingClientRect();
+    const mx = e.clientX - rect.left;
+    const my = e.clientY - rect.top;
+
+    if (dragging === 'azimuth') {
+      const newAz = findClosestAzimuth(mx, my);
+      updateNodeSetting(nodeId, 'rotateRightLeft', newAz);
+    } else if (dragging === 'elevation') {
+      const currentAz = (useFlowStore.getState().nodes.find(n => n.id === nodeId)?.data as unknown as FlowNodeData)?.settings?.rotateRightLeft as number ?? 0;
+      const newEl = findClosestElevation(mx, my, currentAz);
+      updateNodeSetting(nodeId, 'verticalAngle', newEl);
+    }
+  }, [dragging, nodeId, updateNodeSetting, findClosestAzimuth, findClosestElevation]);
+
+  const handleMouseUp = useCallback(() => {
+    setDragging(null);
+  }, []);
+
+  return (
+    <div className="space-y-4">
+      {/* 3D Sphere Camera Control */}
+      <div>
+        <label className="text-[11px] text-zinc-500 block mb-2">Camera Position</label>
+        <div className="flex justify-center">
+          <svg
+            ref={svgRef}
+            width={SPHERE_SIZE}
+            height={SPHERE_SIZE}
+            viewBox={`0 0 ${SPHERE_SIZE} ${SPHERE_SIZE}`}
+            className="cursor-crosshair select-none"
+            onMouseMove={handleMouseMove}
+            onMouseUp={handleMouseUp}
+            onMouseLeave={handleMouseUp}
+          >
+            {longitudeLines.map((pts, i) => (
+              <polyline key={`lon-${i}`} points={pts} fill="none" stroke="#333" strokeWidth={0.5} opacity={0.5} />
+            ))}
+            <path d={equatorPath} fill="none" stroke="#555" strokeWidth={1} />
+            <path d={meridianPath} fill="none" stroke="#555" strokeWidth={1} />
+
+            {/* Direction line from camera to center */}
+            <line x1={cameraPoint.x} y1={cameraPoint.y} x2={CENTER} y2={CENTER} stroke="#555" strokeWidth={1} strokeDasharray="4 3" opacity={0.5} />
+
+            {/* Center camera icon */}
+            <foreignObject x={CENTER - 20} y={CENTER - 20} width={40} height={40}>
+              <div
+                style={{
+                  width: 40, height: 40, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  perspective: '100px', transform: 'rotateX(25deg) rotateY(30deg)', opacity: 0.25,
+                }}
+              >
+                <Camera size={20} color="#888" />
+              </div>
+            </foreignObject>
+
+            {/* Azimuth handle */}
+            <circle
+              cx={azHandle.x} cy={azHandle.y} r={6}
+              fill="white" stroke="#666" strokeWidth={1} className="cursor-grab"
+              onMouseDown={(e) => { e.stopPropagation(); setDragging('azimuth'); }}
+            />
+
+            {/* Elevation handle */}
+            <defs>
+              <linearGradient id={`cam-elev-grad-${nodeId}`} x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stopColor="#555" />
+                <stop offset="100%" stopColor="#ccc" />
+              </linearGradient>
+            </defs>
+            <circle
+              cx={cameraPoint.x} cy={cameraPoint.y} r={12}
+              fill={`url(#cam-elev-grad-${nodeId})`} stroke="#888" strokeWidth={1} className="cursor-grab"
+              onMouseDown={(e) => { e.stopPropagation(); setDragging('elevation'); }}
+            />
+            <foreignObject x={cameraPoint.x - 8} y={cameraPoint.y - 8} width={16} height={16} className="pointer-events-none">
+              <div style={{ width: 16, height: 16, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <Camera size={10} color="#222" />
+              </div>
+            </foreignObject>
+          </svg>
+        </div>
+
+        <div className="flex items-center justify-center gap-4 mt-1">
+          <span className="text-[10px] text-zinc-500">Rot: {azimuth}°</span>
+          <span className="text-[10px] text-zinc-500">Move: {elevation}°</span>
+          <button
+            className="text-[10px] text-zinc-500 hover:text-zinc-300 transition-colors"
+            onClick={() => {
+              updateNodeSetting(nodeId, 'rotateRightLeft', 0);
+              updateNodeSetting(nodeId, 'verticalAngle', 0);
+              updateNodeSetting(nodeId, 'moveForward', 5);
+            }}
+          >
+            Reset
+          </button>
+        </div>
+      </div>
+
+      {/* Preset buttons */}
+      <div>
+        <label className="text-[11px] text-zinc-500 block mb-1.5">Presets</label>
+        <div className="grid grid-cols-3 gap-1">
+          {CAMERA_PRESETS.map((preset) => {
+            const isActive = azimuth === preset.azimuth && elevation === preset.elevation;
+            return (
+              <button
+                key={preset.label}
+                className={`text-[10px] font-medium px-1 py-1.5 rounded-lg border transition-colors ${
+                  isActive
+                    ? 'bg-white/10 border-white/20 text-white'
+                    : 'bg-[#171717] border-[#212121] text-zinc-400 hover:bg-[#212121] hover:text-zinc-300'
+                }`}
+                onClick={() => {
+                  updateNodeSetting(nodeId, 'rotateRightLeft', preset.azimuth);
+                  updateNodeSetting(nodeId, 'verticalAngle', preset.elevation);
+                  updateNodeSetting(nodeId, 'moveForward', preset.zoom);
+                }}
+              >
+                {preset.label}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Rotation (Left/Right) */}
+      <div>
+        <div className="flex items-center justify-between mb-1">
+          <label className="text-[11px] text-zinc-500">Rotation (Left/Right)</label>
+          <span className="text-[11px] text-zinc-300">{azimuth}</span>
+        </div>
+        <input
+          type="range" min={0} max={360} step={1} value={azimuth}
+          className="w-full h-1.5 rounded-full appearance-none bg-[#333] accent-white cursor-pointer"
+          onChange={(e) => updateNodeSetting(nodeId, 'rotateRightLeft', Number(e.target.value))}
+        />
+      </div>
+
+      {/* Move (Up/Down) */}
+      <div>
+        <div className="flex items-center justify-between mb-1">
+          <label className="text-[11px] text-zinc-500">Move (Up/Down)</label>
+          <span className="text-[11px] text-zinc-300">{elevation}</span>
+        </div>
+        <input
+          type="range" min={-30} max={90} step={1} value={elevation}
+          className="w-full h-1.5 rounded-full appearance-none bg-[#333] accent-white cursor-pointer"
+          onChange={(e) => updateNodeSetting(nodeId, 'verticalAngle', Number(e.target.value))}
+        />
+      </div>
+
+      {/* Zoom */}
+      <div>
+        <div className="flex items-center justify-between mb-1">
+          <label className="text-[11px] text-zinc-500">Zoom</label>
+          <span className="text-[11px] text-zinc-300">{zoom}</span>
+        </div>
+        <input
+          type="range" min={0} max={10} step={1} value={zoom}
+          className="w-full h-1.5 rounded-full appearance-none bg-[#333] accent-white cursor-pointer"
+          onChange={(e) => updateNodeSetting(nodeId, 'moveForward', Number(e.target.value))}
+        />
+      </div>
+
+      {/* Aspect Ratio */}
+      <div>
+        <label className="text-[11px] text-zinc-500 block mb-1">Aspect Ratio</label>
+        <select
+          className="w-full bg-[#171717] text-zinc-200 text-xs rounded-lg px-3 py-2 border border-[#212121] focus:outline-none"
+          value={aspectRatio}
+          onChange={(e) => addAspectRatioPreview(nodeId, e.target.value)}
+        >
+          {ASPECT_RATIOS.map((r) => (
+            <option key={r} value={r}>{r}</option>
+          ))}
+        </select>
+      </div>
+
+      {/* Wide Angle Lens */}
+      <div className="flex items-center justify-between">
+        <label className="text-[11px] text-zinc-500">Wide Angle Lens</label>
+        <button
+          className={`w-10 h-5 rounded-full transition-colors relative ${wideAngleLens ? 'bg-emerald-600' : 'bg-[#2a2a2a]'}`}
+          onClick={() => updateNodeSetting(nodeId, 'wideAngleLens', !wideAngleLens)}
+        >
+          <div className={`w-4 h-4 rounded-full bg-white absolute top-0.5 transition-transform ${wideAngleLens ? 'translate-x-5' : 'translate-x-0.5'}`} />
+        </button>
+      </div>
+
+      {/* Guidance Scale */}
+      <div>
+        <div className="flex items-center justify-between mb-1">
+          <label className="text-[11px] text-zinc-500">Guidance Scale</label>
+          <span className="text-[11px] text-zinc-300">{guidanceScale}</span>
+        </div>
+        <input
+          type="range" min={1} max={20} step={0.5} value={guidanceScale}
+          className="w-full h-1.5 rounded-full appearance-none bg-[#333] accent-white cursor-pointer"
+          onChange={(e) => updateNodeSetting(nodeId, 'guidanceScale', Number(e.target.value))}
+        />
+      </div>
+
+      {/* Seed */}
+      <div>
+        <label className="text-[11px] text-zinc-500 block mb-1">Seed</label>
+        <input
+          type="number"
+          className="w-full bg-[#171717] text-zinc-200 text-xs rounded-lg px-3 py-2 border border-[#212121] focus:outline-none"
+          placeholder="Enter Seed"
+          value={seed ?? ''}
+          onChange={(e) => {
+            const v = e.target.value;
+            updateNodeSetting(nodeId, 'seed', v === '' ? undefined : Number(v));
+          }}
+        />
+      </div>
+
+      {/* Enable Safety Checker */}
+      <div className="flex items-center justify-between">
+        <label className="text-[11px] text-zinc-500">Enable Safety Checker</label>
+        <button
+          className={`w-10 h-5 rounded-full transition-colors relative ${enableSafetyChecker ? 'bg-emerald-600' : 'bg-[#2a2a2a]'}`}
+          onClick={() => updateNodeSetting(nodeId, 'enableSafetyChecker', !enableSafetyChecker)}
+        >
+          <div className={`w-4 h-4 rounded-full bg-white absolute top-0.5 transition-transform ${enableSafetyChecker ? 'translate-x-5' : 'translate-x-0.5'}`} />
+        </button>
       </div>
 
       {/* Resolution */}
@@ -560,6 +921,11 @@ export function PropertiesPanel() {
           <RelightProperties nodeId={selectedNode.id} settings={settings} />
         )}
 
+        {/* Camera Angles properties */}
+        {selectedNode.type === 'cameraAngles' && (
+          <CameraAnglesProperties nodeId={selectedNode.id} settings={settings} />
+        )}
+
         {/* Settings from SettingDef */}
         {modelDef && modelDef.settings.length > 0 && (
           <div>
@@ -580,7 +946,7 @@ export function PropertiesPanel() {
         )}
 
         {/* Fallback settings for non-model nodes (prompt, import, etc.) */}
-        {!modelDef && selectedNode.type !== 'relight' && Object.keys(settings).length > 0 && (
+        {!modelDef && selectedNode.type !== 'relight' && selectedNode.type !== 'cameraAngles' && Object.keys(settings).length > 0 && (
           <div>
             <label className="text-[11px] text-zinc-500 block mb-2">Settings</label>
             <div className="space-y-3">

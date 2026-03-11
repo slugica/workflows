@@ -5,51 +5,57 @@ import { Handle, Position, useEdges, useNodes, type NodeProps } from '@xyflow/re
 import { FlowNodeData, HANDLE_COLORS } from '@/lib/types';
 import { resolveInputImageUrl } from '@/lib/resolveInput';
 import { useFlowStore } from '@/store/flowStore';
-import { Sun, Play, Loader, ChevronLeft, ChevronRight, Trash2 } from 'lucide-react';
+import { Camera, Play, Loader, ChevronLeft, ChevronRight, Trash2 } from 'lucide-react';
 
-/* ─── Prompt generation helpers ─── */
-function getAzimuthPrompt(az: number): string {
+/* ─── Prompt generation helpers for camera angle ─── */
+function getRotationPrompt(az: number): string {
   const n = ((az % 360) + 360) % 360;
-  if (n < 30)  return 'Subtle offset lighting from the front-right, soft modeling shadows on the left.';
-  if (n < 60)  return 'High-contrast side lighting from the right, sculpting the cheekbones.';
-  if (n < 90)  return 'Sharp profile lighting from the direct right (same as Right preset).';
-  if (n < 120) return 'Back-right lighting, highlighting the right shoulder and jawline from behind.';
-  if (n < 150) return 'Deep back-lighting from the right rear, creating a thin rim of light on the right edge.';
-  if (n < 180) return 'Pure backlight, halo effect (same as Back preset).';
-  if (n < 210) return 'Pure backlight, intense rim lighting, halo effect around the silhouette.';
-  if (n < 240) return 'Deep back-lighting from the rear-left, thin rim light on the left jaw and shoulder.';
-  if (n < 270) return 'Kicker light from the back-left, highlighting the left side profile from behind.';
-  if (n < 300) return 'Hard side-lighting from the direct left, half the face in shadow (same as Left preset).';
-  if (n < 330) return 'Broad lighting from the front-left, well-defined facial features with soft shadows on the right.';
-  return 'Subtle offset lighting from the front-left, nearly frontal but with slight depth.';
+  if (n < 15)  return 'Frontal view, camera facing the subject directly from the front.';
+  if (n < 45)  return 'Slight right turn, camera shifted slightly to the right showing a three-quarter front-right view.';
+  if (n < 75)  return 'Right profile view, camera positioned at the right side showing the right profile.';
+  if (n < 105) return 'Sharp right profile, camera at 90 degrees showing full right side of the subject.';
+  if (n < 135) return 'Back-right view, camera rotated behind and to the right of the subject.';
+  if (n < 165) return 'Rear three-quarter right, camera mostly behind the subject offset to the right.';
+  if (n < 195) return 'Rear view, camera positioned directly behind the subject.';
+  if (n < 225) return 'Rear three-quarter left, camera mostly behind the subject offset to the left.';
+  if (n < 255) return 'Back-left view, camera rotated behind and to the left of the subject.';
+  if (n < 285) return 'Sharp left profile, camera at 270 degrees showing full left side of the subject.';
+  if (n < 315) return 'Left profile view, camera positioned at the left side showing the left profile.';
+  if (n < 345) return 'Slight left turn, camera shifted slightly to the left showing a three-quarter front-left view.';
+  return 'Frontal view, camera facing the subject directly from the front.';
 }
 
-function getElevationPrompt(el: number): string {
-  if (el >= 60)  return 'Vertical overhead light, god ray effect (same as Top preset).';
-  if (el >= 30)  return 'High-angle lighting, creates deep shadows in the eye sockets and under the nose.';
-  if (el >= 0)   return 'Classic Rembrandt lighting, light source slightly elevated above eye level.';
-  if (el >= -30) return 'Low-angle lighting, light hitting the chin and neck, casting shadows upward.';
-  if (el >= -60) return 'Steep low-angle lighting, dramatic horror-style lighting from below.';
-  return 'Direct vertical light from the ground (same as Bottom preset).';
+function getVerticalPrompt(el: number): string {
+  if (el >= 70)  return 'Overhead bird\'s-eye view, camera directly above looking straight down.';
+  if (el >= 45)  return 'High-angle shot, camera positioned well above eye level looking down at the subject.';
+  if (el >= 20)  return 'Slightly elevated camera angle, above eye level with a gentle downward tilt.';
+  if (el >= -10) return 'Eye-level camera angle, standard straight-on perspective.';
+  if (el >= -25) return 'Slightly low angle, camera below eye level tilting upward.';
+  return 'Low-angle worm\'s-eye view, camera positioned below looking up at the subject.';
 }
 
-function getIntensityPrompt(intensity: number): string {
-  if (intensity <= 3) return 'With soft, diffused ambient glow.';
-  if (intensity <= 7) return 'With clear directional studio lighting.';
-  return 'With harsh, high-contrast intense spotlight.';
+function getZoomPrompt(zoom: number): string {
+  if (zoom <= 2) return 'Wide shot, subject appears small in the frame with lots of environment visible.';
+  if (zoom <= 4) return 'Medium-wide shot, subject with surrounding context visible.';
+  if (zoom <= 6) return 'Medium shot, standard framing of the subject.';
+  if (zoom <= 8) return 'Close-up shot, subject fills most of the frame.';
+  return 'Extreme close-up, tight framing on the subject with fine detail visible.';
 }
 
-function buildRelightPrompt(azimuth: number, elevation: number, intensity: number, colorHex: string): string {
-  return [
-    `Horizontal Lighting Instruction : ${getAzimuthPrompt(azimuth)};`,
-    `Vertical Lighting Instruction : ${getElevationPrompt(elevation)};`,
-    `Intensity Instruction: ${getIntensityPrompt(intensity)};`,
-    `Light Color instruction: Hex Code: ${colorHex};`,
-  ].join('\n');
+function buildCameraPrompt(azimuth: number, elevation: number, zoom: number, wideAngle: boolean): string {
+  const parts = [
+    `Camera Rotation: ${getRotationPrompt(azimuth)}`,
+    `Camera Vertical Angle: ${getVerticalPrompt(elevation)}`,
+    `Camera Zoom: ${getZoomPrompt(zoom)}`,
+  ];
+  if (wideAngle) {
+    parts.push('Use a wide-angle lens with slight barrel distortion for a more dynamic perspective.');
+  }
+  return parts.join('\n');
 }
 
 /* ─── Component ─── */
-export function RelightNode(props: NodeProps) {
+export function CameraAnglesNode(props: NodeProps) {
   const { id, selected } = props;
   const data = props.data as unknown as FlowNodeData;
   const selectNode = useFlowStore((s) => s.selectNode);
@@ -70,17 +76,37 @@ export function RelightNode(props: NodeProps) {
   const inputImageUrl = resolveInputImageUrl(id, allNodes, edges);
   const hasInput = !!inputImageUrl;
 
+  /* ─── Resolve negative prompt from text input ─── */
+  const negativePrompt = useMemo(() => {
+    const negEdge = edges.find(
+      (e) => e.target === id && e.targetHandle?.includes(':text:negativePrompt')
+    );
+    if (!negEdge) return (data.settings.negativePrompt as string) || '';
+    const sourceNode = allNodes.find((n) => n.id === negEdge.source);
+    if (!sourceNode) return '';
+    const sourceData = sourceNode.data as unknown as FlowNodeData;
+    if (sourceData.results?.length > 0) {
+      const selected = sourceData.results[sourceData.selectedResultIndex || 0];
+      const first = selected ? Object.values(selected)[0] : null;
+      if (first?.content) return first.content;
+    }
+    return (sourceData.settings?.promptText as string) || '';
+  }, [id, edges, allNodes, data.settings.negativePrompt]);
+
   /* ─── Run handler ─── */
   const handleRun = async () => {
     if (!inputImageUrl) return;
     useFlowStore.getState().updateNodeData(id, { status: 'running', errorMessage: '' });
 
-    const azimuth = (data.settings.azimuth as number) ?? 0;
-    const elevation = (data.settings.elevation as number) ?? 0;
-    const intensity = (data.settings.lightIntensity as number) ?? 7;
-    const colorHex = (data.settings.colorHex as string) ?? '#ffffff';
+    const azimuth = (data.settings.rotateRightLeft as number) ?? 0;
+    const elevation = (data.settings.verticalAngle as number) ?? 0;
+    const zoom = (data.settings.moveForward as number) ?? 5;
+    const guidanceScale = (data.settings.guidanceScale as number) ?? 4.5;
+    const wideAngleLens = (data.settings.wideAngleLens as boolean) ?? false;
+    const enableSafetyChecker = (data.settings.enableSafetyChecker as boolean) ?? false;
+    const seed = data.settings.seed as number | undefined;
 
-    const prompt = buildRelightPrompt(azimuth, elevation, intensity, colorHex);
+    const prompt = buildCameraPrompt(azimuth, elevation, zoom, wideAngleLens);
 
     try {
       const res = await fetch('/api/fal', {
@@ -90,11 +116,15 @@ export function RelightNode(props: NodeProps) {
           modelId: 'fal-ai/nano-banana-2/edit',
           input: {
             prompt,
+            ...(negativePrompt ? { negative_prompt: negativePrompt } : {}),
             image_urls: [inputImageUrl],
             aspect_ratio: (data.settings.aspectRatio as string) || '3:4',
             resolution: (data.settings.resolution as string) || '1K',
             num_images: 1,
             output_format: 'png',
+            guidance_scale: guidanceScale,
+            ...(enableSafetyChecker ? { enable_safety_checker: true } : {}),
+            ...(seed != null ? { seed } : {}),
           },
         }),
       });
@@ -151,7 +181,7 @@ export function RelightNode(props: NodeProps) {
             }}
           />
         </div>
-        <span className="text-[11px] text-white/50">Relight</span>
+        <span className="text-[11px] text-white/50">Change Camera Angle</span>
       </div>
 
       {/* Card */}
@@ -167,13 +197,13 @@ export function RelightNode(props: NodeProps) {
       >
         {/* Header */}
         <header className="mb-2 flex h-7 items-center justify-between gap-2 self-stretch">
-          <span className="text-white"><Sun size={18} /></span>
+          <span className="text-white"><Camera size={18} /></span>
           <h3 className="text-base font-medium text-white line-clamp-1 flex-1 text-ellipsis overflow-hidden">
-            Relight
+            Multiple Camera Angles
           </h3>
         </header>
 
-        {/* Input handle */}
+        {/* Input handles */}
         {data.handles.inputs.length > 0 && (
           <div className="pointer-events-none absolute top-[68px] -left-[10px] flex flex-col items-center justify-center gap-6">
             {data.handles.inputs.map((handle, i) => {
@@ -240,7 +270,7 @@ export function RelightNode(props: NodeProps) {
             />
           ) : resultUrl && resultMeta?.format !== 'preview' ? (
             <div className="relative bg-[#212121] rounded-2xl overflow-hidden">
-              <img src={resultUrl} alt="Relight result" className="w-full" />
+              <img src={resultUrl} alt="Camera angle result" className="w-full" />
               {data.results.length > 1 && (
                 <div className="absolute top-2 left-2 right-2 flex items-center justify-between">
                   <div className="flex items-center gap-1">

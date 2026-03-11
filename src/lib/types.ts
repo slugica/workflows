@@ -36,7 +36,7 @@ export interface FlowNodeData {
   errorMessage?: string;
 }
 
-export type FlowNodeType = 'import' | 'prompt' | 'image' | 'video' | 'audio' | 'textUtility' | 'crop' | 'export' | 'preview' | 'blur' | 'resize' | 'filters' | 'levels' | 'splitImage' | 'imageIterator' | 'aiResize' | 'relight';
+export type FlowNodeType = 'import' | 'prompt' | 'image' | 'video' | 'audio' | 'textUtility' | 'crop' | 'export' | 'preview' | 'blur' | 'resize' | 'filters' | 'levels' | 'splitImage' | 'imageIterator' | 'aiResize' | 'relight' | 'cameraAngles';
 
 export interface NodeTemplate {
   type: FlowNodeType;
@@ -215,7 +215,7 @@ const STATIC_TEMPLATES: NodeTemplate[] = [
   {
     type: 'relight',
     label: 'Relight',
-    category: 'Image Editing',
+    category: 'Utility',
     defaultData: {
       behavior: 'static',
       handles: {
@@ -223,6 +223,31 @@ const STATIC_TEMPLATES: NodeTemplate[] = [
         outputs: [{ id: '', key: 'image', label: 'Image', type: 'image' }],
       },
       settings: { azimuth: 0, elevation: 0, lightIntensity: 7, colorHex: '#ffffff', aspectRatio: '3:4', resolution: '1K' },
+    },
+  },
+  {
+    type: 'cameraAngles',
+    label: 'Multiple Camera Angles',
+    category: 'Utility',
+    defaultData: {
+      behavior: 'static',
+      handles: {
+        inputs: [
+          { id: '', key: 'imageUrl', label: 'Image', type: 'image', required: true },
+          { id: '', key: 'negativePrompt', label: 'Negative Prompt', type: 'text', required: false },
+        ],
+        outputs: [{ id: '', key: 'image', label: 'Image', type: 'image' }],
+      },
+      settings: {
+        rotateRightLeft: 0,
+        verticalAngle: 0,
+        moveForward: 5,
+        wideAngleLens: false,
+        guidanceScale: 4.5,
+        enableSafetyChecker: false,
+        aspectRatio: '3:4',
+        resolution: '1K',
+      },
     },
   },
   {
