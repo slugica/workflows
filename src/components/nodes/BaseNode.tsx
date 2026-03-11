@@ -4,7 +4,7 @@ import { useRef, useCallback, useMemo, useState, type ReactNode } from 'react';
 import { Handle, Position, useEdges, type NodeProps } from '@xyflow/react';
 import { FlowNodeData, HANDLE_COLORS } from '@/lib/types';
 import { useFlowStore } from '@/store/flowStore';
-import { Upload, Type, ImageIcon, Video, AudioLines, Bot, Play, Loader } from 'lucide-react';
+import { Upload, Type, ImageIcon, Video, AudioLines, Bot, Play, Loader, ChevronLeft, ChevronRight, Trash2 } from 'lucide-react';
 
 const TYPE_ICONS: Record<string, ReactNode> = {
   import: <Upload size={18} />,
@@ -285,7 +285,7 @@ export function BaseNode(props: NodeProps) {
         ) : null}
         {data.results && data.results.length > 0 ? (
           <div className="self-stretch">
-            <div className="bg-[#212121] rounded-2xl overflow-hidden">
+            <div className="relative bg-[#212121] rounded-2xl overflow-hidden">
               {(() => {
                 const result = data.results[data.selectedResultIndex || 0];
                 if (!result) return null;
@@ -309,21 +309,52 @@ export function BaseNode(props: NodeProps) {
                   />
                 );
               })()}
-            </div>
-            {data.results.length > 1 ? (
-              <div className="flex items-center justify-center gap-1 mt-2">
-                {data.results.map((_, i) => (
+              {data.results.length > 1 && (
+                <div className="absolute top-2 left-2 right-2 flex items-center justify-between">
+                  <div className="flex items-center gap-1">
+                    <button
+                      className="w-7 h-7 rounded-full bg-black/60 hover:bg-black/80 flex items-center justify-center nodrag transition-colors"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        const prev = (data.selectedResultIndex || 0) - 1;
+                        if (prev >= 0) useFlowStore.getState().updateNodeData(id, { selectedResultIndex: prev });
+                      }}
+                    >
+                      <ChevronLeft size={14} className="text-white" />
+                    </button>
+                    <span className="text-xs text-white font-medium px-1">
+                      {(data.selectedResultIndex || 0) + 1}/{data.results.length}
+                    </span>
+                    <button
+                      className="w-7 h-7 rounded-full bg-black/60 hover:bg-black/80 flex items-center justify-center nodrag transition-colors"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        const next = (data.selectedResultIndex || 0) + 1;
+                        if (next < data.results.length) useFlowStore.getState().updateNodeData(id, { selectedResultIndex: next });
+                      }}
+                    >
+                      <ChevronRight size={14} className="text-white" />
+                    </button>
+                  </div>
                   <button
-                    key={i}
-                    className={`w-2 h-2 rounded-full nodrag ${i === (data.selectedResultIndex || 0) ? 'bg-white' : 'bg-zinc-600'}`}
+                    className="w-7 h-7 rounded-full bg-black/60 hover:bg-red-900/80 flex items-center justify-center nodrag transition-colors"
                     onClick={(e) => {
                       e.stopPropagation();
-                      useFlowStore.getState().updateNodeData(id, { selectedResultIndex: i });
+                      const idx = data.selectedResultIndex || 0;
+                      const newResults = data.results.filter((_, i) => i !== idx);
+                      const newIdx = Math.min(idx, newResults.length - 1);
+                      useFlowStore.getState().updateNodeData(id, {
+                        results: newResults,
+                        selectedResultIndex: Math.max(0, newIdx),
+                        ...(newResults.length === 0 ? { status: 'idle' as const } : {}),
+                      });
                     }}
-                  />
-                ))}
-              </div>
-            ) : null}
+                  >
+                    <Trash2 size={12} className="text-white" />
+                  </button>
+                </div>
+              )}
+            </div>
           </div>
         ) : null}
 

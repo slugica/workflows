@@ -262,10 +262,13 @@ export const useFlowStore = create<FlowState>((set, get) => ({
     try {
       const result = await executeNode(id, get().nodes, get().edges);
       if (result.success && result.results) {
+        const currentData = (get().nodes.find(n => n.id === id)?.data as unknown as FlowNodeData);
+        const existingResults = currentData?.results || [];
+        const allResults = [...existingResults, ...result.results];
         store.updateNodeData(id, {
           status: 'done',
-          results: result.results,
-          selectedResultIndex: 0,
+          results: allResults,
+          selectedResultIndex: allResults.length - 1,
         });
       } else {
         store.updateNodeData(id, {

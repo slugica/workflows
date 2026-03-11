@@ -28,8 +28,14 @@ export function resolveInputImageUrl(
   if (sourceData.results && sourceData.results.length > 0) {
     // Parse source handle key (e.g. "nodeId|output:image:split_4" → "split_4")
     const sourceHandleKey = incomingEdge.sourceHandle?.split(':').pop();
+    const selectedResult = sourceData.results[sourceData.selectedResultIndex || 0];
 
-    // Try to find a result matching the specific source handle key
+    // First try the selected result by handle key
+    if (sourceHandleKey && selectedResult?.[sourceHandleKey]?.content) {
+      return selectedResult[sourceHandleKey].content;
+    }
+
+    // For split-output nodes: scan all results for a matching key (e.g. split_1, split_2)
     if (sourceHandleKey) {
       for (const result of sourceData.results) {
         if (result[sourceHandleKey]?.content) {
@@ -38,10 +44,9 @@ export function resolveInputImageUrl(
       }
     }
 
-    // Fallback: use selectedResultIndex (for single-output nodes like AI)
-    const result = sourceData.results[sourceData.selectedResultIndex || 0];
-    if (result) {
-      const entry = Object.values(result)[0];
+    // Fallback: use selectedResultIndex with first entry
+    if (selectedResult) {
+      const entry = Object.values(selectedResult)[0];
       if (entry?.content) return entry.content;
     }
   }

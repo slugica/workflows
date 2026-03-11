@@ -36,7 +36,7 @@ export interface FlowNodeData {
   errorMessage?: string;
 }
 
-export type FlowNodeType = 'import' | 'prompt' | 'image' | 'video' | 'audio' | 'textUtility' | 'crop' | 'export' | 'preview' | 'blur' | 'resize' | 'filters' | 'levels' | 'splitImage' | 'imageIterator';
+export type FlowNodeType = 'import' | 'prompt' | 'image' | 'video' | 'audio' | 'textUtility' | 'crop' | 'export' | 'preview' | 'blur' | 'resize' | 'filters' | 'levels' | 'splitImage' | 'imageIterator' | 'aiResize';
 
 export interface NodeTemplate {
   type: FlowNodeType;
@@ -197,6 +197,19 @@ const STATIC_TEMPLATES: NodeTemplate[] = [
         outputs: [{ id: '', key: 'file', label: 'File', type: 'image' }],
       },
       settings: {},
+    },
+  },
+  {
+    type: 'aiResize',
+    label: 'AI Resize',
+    category: 'Utility',
+    defaultData: {
+      behavior: 'static',
+      handles: {
+        inputs: [{ id: '', key: 'imageUrl', label: 'Reference Image', type: 'image', required: true }],
+        outputs: [{ id: '', key: 'image', label: 'Image', type: 'image' }],
+      },
+      settings: { aspectRatio: '1:1' },
     },
   },
   {
