@@ -29,6 +29,7 @@ import { ResizeNode } from '@/components/nodes/ResizeNode';
 import { FiltersNode } from '@/components/nodes/FiltersNode';
 import { LevelsNode } from '@/components/nodes/LevelsNode';
 import { SplitImageNode } from '@/components/nodes/SplitImageNode';
+import { ImageIteratorNode } from '@/components/nodes/ImageIteratorNode';
 import { FlowNodeType, HANDLE_COLORS, type FlowNodeData } from '@/lib/types';
 
 function CustomConnectionLine({ fromX, fromY, toX, toY, fromNode, fromHandle }: ConnectionLineComponentProps) {
@@ -61,6 +62,7 @@ const nodeTypes: NodeTypes = {
   filters: FiltersNode,
   levels: LevelsNode,
   splitImage: SplitImageNode,
+  imageIterator: ImageIteratorNode,
 };
 
 function parseHandleInfo(handleId: string): { direction: string; type: string; key: string } | null {

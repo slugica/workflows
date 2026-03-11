@@ -36,7 +36,7 @@ export interface FlowNodeData {
   errorMessage?: string;
 }
 
-export type FlowNodeType = 'import' | 'prompt' | 'image' | 'video' | 'audio' | 'textUtility' | 'crop' | 'export' | 'preview' | 'blur' | 'resize' | 'filters' | 'levels' | 'splitImage';
+export type FlowNodeType = 'import' | 'prompt' | 'image' | 'video' | 'audio' | 'textUtility' | 'crop' | 'export' | 'preview' | 'blur' | 'resize' | 'filters' | 'levels' | 'splitImage' | 'imageIterator';
 
 export interface NodeTemplate {
   type: FlowNodeType;
@@ -195,6 +195,19 @@ const STATIC_TEMPLATES: NodeTemplate[] = [
       handles: {
         inputs: [{ id: '', key: 'file', label: 'File', type: 'image', required: true }],
         outputs: [{ id: '', key: 'file', label: 'File', type: 'image' }],
+      },
+      settings: {},
+    },
+  },
+  {
+    type: 'imageIterator',
+    label: 'Image Iterator',
+    category: 'Utility',
+    defaultData: {
+      behavior: 'static',
+      handles: {
+        inputs: [{ id: '', key: 'image_1', label: 'Input', type: 'image', required: false, dynamic: true, maxDynamic: 20, dynamicBase: 'image' }],
+        outputs: [{ id: '', key: 'output', label: 'Output', type: 'image' }],
       },
       settings: {},
     },
