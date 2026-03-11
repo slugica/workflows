@@ -206,6 +206,7 @@ export function FlowCanvas() {
         nodeTypes={nodeTypes}
         deleteKeyCode={['Backspace', 'Delete']}
         fitView
+        fitViewOptions={{ maxZoom: 1 }}
         colorMode="dark"
         defaultEdgeOptions={{
           type: 'smoothstep',

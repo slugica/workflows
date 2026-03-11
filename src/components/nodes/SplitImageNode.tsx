@@ -265,7 +265,7 @@ export function SplitImageNode(props: NodeProps) {
                     className="handle-label absolute top-[-20px] right-[14px] whitespace-nowrap text-sm font-medium opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none"
                     style={{ color: HANDLE_COLORS[handle.type] }}
                   >
-                    {handle.label}
+                    {handle.label}{handle.required ? ' *' : ''}
                   </span>
                 </Handle>
               );
@@ -297,7 +297,7 @@ export function SplitImageNode(props: NodeProps) {
                     className="handle-label absolute top-[-20px] left-[24px] whitespace-nowrap text-sm font-medium opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none"
                     style={{ color: HANDLE_COLORS[handle.type] }}
                   >
-                    {handle.label}
+                    {handle.label}{handle.required ? ' *' : ''}
                   </span>
                 </Handle>
               );
