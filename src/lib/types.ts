@@ -36,7 +36,7 @@ export interface FlowNodeData {
   errorMessage?: string;
 }
 
-export type FlowNodeType = 'import' | 'prompt' | 'image' | 'video' | 'audio' | 'textUtility' | 'crop' | 'export' | 'preview' | 'blur' | 'resize' | 'filters' | 'levels' | 'splitImage' | 'imageIterator' | 'aiResize' | 'relight' | 'cameraAngles';
+export type FlowNodeType = 'import' | 'prompt' | 'image' | 'video' | 'audio' | 'crop' | 'export' | 'preview' | 'blur' | 'resize' | 'filters' | 'levels' | 'splitImage' | 'imageIterator' | 'aiResize' | 'relight' | 'cameraAngles' | 'section';
 
 export interface NodeTemplate {
   type: FlowNodeType;
@@ -274,19 +274,6 @@ const STATIC_TEMPLATES: NodeTemplate[] = [
         outputs: [],
       },
       settings: {},
-    },
-  },
-  {
-    type: 'textUtility',
-    label: 'AI Copilot',
-    category: 'Text',
-    defaultData: {
-      behavior: 'dynamic',
-      handles: {
-        inputs: [{ id: '', key: 'prompt', label: 'Input', type: 'text', required: true }],
-        outputs: [{ id: '', key: 'prompt', label: 'Output', type: 'text' }],
-      },
-      settings: { systemPrompt: 'You are a creative assistant.' },
     },
   },
 ];

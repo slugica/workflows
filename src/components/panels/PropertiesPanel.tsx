@@ -1020,25 +1020,27 @@ export function PropertiesPanel() {
         )}
 
         {/* Handles info */}
-        <div>
-          <label className="text-[11px] text-zinc-500 block mb-2">Connections</label>
-          <div className="space-y-1">
-            {nodeData.handles.inputs.map((h) => (
-              <div key={h.id} className="text-[10px] text-zinc-600 flex gap-1">
-                <span className="text-zinc-500">IN</span>
-                <span>{h.label}</span>
-                <span className="text-zinc-700">({h.type})</span>
-              </div>
-            ))}
-            {nodeData.handles.outputs.map((h) => (
-              <div key={h.id} className="text-[10px] text-zinc-600 flex gap-1">
-                <span className="text-zinc-500">OUT</span>
-                <span>{h.label}</span>
-                <span className="text-zinc-700">({h.type})</span>
-              </div>
-            ))}
+        {nodeData.handles && (
+          <div>
+            <label className="text-[11px] text-zinc-500 block mb-2">Connections</label>
+            <div className="space-y-1">
+              {nodeData.handles.inputs.map((h) => (
+                <div key={h.id} className="text-[10px] text-zinc-600 flex gap-1">
+                  <span className="text-zinc-500">IN</span>
+                  <span>{h.label}</span>
+                  <span className="text-zinc-700">({h.type})</span>
+                </div>
+              ))}
+              {nodeData.handles.outputs.map((h) => (
+                <div key={h.id} className="text-[10px] text-zinc-600 flex gap-1">
+                  <span className="text-zinc-500">OUT</span>
+                  <span>{h.label}</span>
+                  <span className="text-zinc-700">({h.type})</span>
+                </div>
+              ))}
+            </div>
           </div>
-        </div>
+        )}
 
         {/* Run button for dynamic nodes */}
         {nodeData.behavior === 'dynamic' && (

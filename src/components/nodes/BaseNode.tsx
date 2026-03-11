@@ -1,10 +1,10 @@
 'use client';
 
 import { useRef, useCallback, useMemo, useState, type ReactNode } from 'react';
-import { Handle, Position, useEdges, type NodeProps } from '@xyflow/react';
+import { Handle, Position, useEdges, NodeResizer, type NodeProps } from '@xyflow/react';
 import { FlowNodeData, HANDLE_COLORS } from '@/lib/types';
 import { useFlowStore } from '@/store/flowStore';
-import { Upload, Type, ImageIcon, Video, AudioLines, Bot, Play, Loader, ChevronLeft, ChevronRight, Trash2 } from 'lucide-react';
+import { Upload, Type, ImageIcon, Video, AudioLines, Play, Loader, ChevronLeft, ChevronRight, Trash2 } from 'lucide-react';
 
 const TYPE_ICONS: Record<string, ReactNode> = {
   import: <Upload size={18} />,
@@ -12,7 +12,6 @@ const TYPE_ICONS: Record<string, ReactNode> = {
   image: <ImageIcon size={18} />,
   video: <Video size={18} />,
   audio: <AudioLines size={18} />,
-  textUtility: <Bot size={18} />,
 };
 
 const TYPE_LABELS: Record<string, string> = {
@@ -21,7 +20,6 @@ const TYPE_LABELS: Record<string, string> = {
   image: 'Image',
   video: 'Video',
   audio: 'Audio',
-  textUtility: 'AI Copilot',
 };
 
 export function BaseNode(props: NodeProps) {
@@ -89,12 +87,23 @@ export function BaseNode(props: NodeProps) {
     }
   }, [id]);
 
+  const isPrompt = nodeType === 'prompt';
+
   return (
     <div
-      className="group relative flex flex-col items-center gap-1"
-      style={{ width: contentSize ? contentSize.w + 36 : 356 }}
+      className={`group relative flex flex-col items-center gap-1 ${isPrompt ? 'w-full h-full' : ''}`}
+      style={isPrompt ? undefined : { width: contentSize ? contentSize.w + 36 : 356 }}
       onClick={() => selectNode(id)}
     >
+      {isPrompt && (
+        <NodeResizer
+          minWidth={280}
+          minHeight={200}
+          isVisible={selected}
+          lineClassName="!border-transparent"
+          handleClassName="!w-3 !h-3 !bg-transparent !border-none !rounded-none"
+        />
+      )}
       {/* Top info bar - above the card */}
       <div className="absolute bottom-full left-0 mb-1 flex w-full flex-row items-center justify-between gap-2 px-1">
         <div className="flex items-center justify-center p-0.5">
@@ -117,7 +126,7 @@ export function BaseNode(props: NodeProps) {
       <div
         className={`
           bg-[#171717] rounded-[24px] border-2 border-[#212121] relative flex flex-col items-start
-          p-4 pt-3 w-full
+          p-4 pt-3 w-full ${isPrompt ? 'flex-1' : ''}
           drop-shadow-sm group-hover:drop-shadow-md
           ${selected ? 'border-white/30 show-labels' : ''}
           ${data.status === 'running' ? 'border-yellow-400/50' : ''}
@@ -197,7 +206,7 @@ export function BaseNode(props: NodeProps) {
         {/* Content area */}
         {nodeType === 'prompt' ? (
           <textarea
-            className="w-full min-h-[172px] bg-[#212121] rounded-xl text-white text-base leading-6 p-3 resize-none border-none focus:outline-none focus:ring-0 nodrag nowheel nopan self-stretch"
+            className="w-full h-full min-h-[172px] bg-[#212121] rounded-xl text-white text-base leading-6 p-3 resize-none border-none focus:outline-none focus:ring-0 nodrag nowheel nopan self-stretch flex-1"
             placeholder="Enter your prompt here..."
             defaultValue={(data.settings.promptText as string) || ''}
             onChange={(e) => {

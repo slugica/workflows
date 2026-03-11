@@ -13,19 +13,35 @@ import {
 import { FlowNodeData, FlowNodeType, NODE_TEMPLATES, HandleDef, HANDLE_COLORS, HandleDataType } from '@/lib/types';
 import { executeNode } from '@/lib/executeNode';
 
+interface Snapshot {
+  nodes: Node[];
+  edges: Edge[];
+}
+
+type DrawingMode = 'none' | 'section';
+
 interface FlowState {
   nodes: Node[];
   edges: Edge[];
   selectedNodeId: string | null;
+  undoStack: Snapshot[];
+  redoStack: Snapshot[];
+  drawingMode: DrawingMode;
+  setDrawingMode: (mode: DrawingMode) => void;
   onNodesChange: OnNodesChange;
   onEdgesChange: OnEdgesChange;
   onConnect: OnConnect;
   addNode: (type: FlowNodeType, templateLabel: string, position: { x: number; y: number }) => void;
+  addSection: (position: { x: number; y: number }, size?: { width: number; height: number }) => void;
   selectNode: (id: string | null) => void;
   updateNodeData: (id: string, data: Partial<FlowNodeData>) => void;
   updateNodeSetting: (id: string, key: string, value: unknown) => void;
   deleteNode: (id: string) => void;
   runNode: (id: string) => Promise<void>;
+  uploadFileToNewNode: (file: File, position: { x: number; y: number }) => void;
+  undo: () => void;
+  redo: () => void;
+  pushUndo: () => void;
   toJSON: () => string;
   loadJSON: (json: string) => void;
 }
@@ -46,6 +62,10 @@ export const useFlowStore = create<FlowState>((set, get) => ({
   nodes: [],
   edges: [],
   selectedNodeId: null,
+  undoStack: [],
+  redoStack: [],
+  drawingMode: 'none',
+  setDrawingMode: (mode) => set({ drawingMode: mode }),
 
   onNodesChange: (changes) => {
     set({ nodes: applyNodeChanges(changes, get().nodes) });
@@ -107,6 +127,8 @@ export const useFlowStore = create<FlowState>((set, get) => ({
     const sourceType = parseHandleType(sourceHandle);
     const targetType = parseHandleType(targetHandle);
     if (!sourceType || !targetType || sourceType !== targetType) return;
+
+    get().pushUndo();
 
     // Replace existing connection to the same target handle (allows reconnecting)
     const filteredEdges = get().edges.filter((e) => e.targetHandle !== targetHandle);
@@ -173,6 +195,7 @@ export const useFlowStore = create<FlowState>((set, get) => ({
   addNode: (type, templateLabel, position) => {
     const template = NODE_TEMPLATES.find((t) => t.type === type && t.label === templateLabel);
     if (!template) return;
+    get().pushUndo();
 
     const nodeId = generateId();
     const existingCount = get().nodes.filter((n) => n.type === type).length;
@@ -204,10 +227,48 @@ export const useFlowStore = create<FlowState>((set, get) => ({
       type,
       position,
       data: data as unknown as Record<string, unknown>,
+      ...(type === 'prompt' ? { style: { width: 356, height: 280 } } : {}),
     };
 
     set({
       nodes: [...get().nodes.map((n) => ({ ...n, selected: false })), { ...newNode, selected: true }],
+      selectedNodeId: nodeId,
+    });
+  },
+
+  addSection: (position, size) => {
+    get().pushUndo();
+    const nodeId = generateId();
+    const existingCount = get().nodes.filter((n) => n.type === 'section').length;
+    const w = size?.width ?? 600;
+    const h = size?.height ?? 400;
+    const newNode: Node = {
+      id: nodeId,
+      type: 'section',
+      position,
+      data: { label: `Section ${existingCount + 1}` },
+      style: { width: w, height: h },
+    };
+    // Parent existing nodes that fall inside the new section
+    const sx = position.x;
+    const sy = position.y;
+    const updatedNodes = get().nodes.map((n) => {
+      if (n.type === 'section' || n.parentId) return { ...n, selected: false };
+      const nx = n.position.x;
+      const ny = n.position.y;
+      if (nx > sx && ny > sy && nx < sx + w && ny < sy + h) {
+        return {
+          ...n,
+          selected: false,
+          parentId: nodeId,
+          position: { x: nx - sx, y: ny - sy },
+        };
+      }
+      return { ...n, selected: false };
+    });
+    // Sections must come before other nodes for proper z-ordering
+    set({
+      nodes: [{ ...newNode, selected: true }, ...updatedNodes],
       selectedNodeId: nodeId,
     });
   },
@@ -241,8 +302,27 @@ export const useFlowStore = create<FlowState>((set, get) => ({
   },
 
   deleteNode: (id) => {
+    get().pushUndo();
+    const deletedNode = get().nodes.find((n) => n.id === id);
+    const isSection = deletedNode?.type === 'section';
     set({
-      nodes: get().nodes.filter((n) => n.id !== id),
+      nodes: get().nodes
+        .filter((n) => n.id !== id)
+        .map((n) => {
+          // Unparent children when section is deleted — convert to absolute position
+          if (isSection && n.parentId === id) {
+            return {
+              ...n,
+              parentId: undefined,
+              extent: undefined,
+              position: {
+                x: n.position.x + (deletedNode?.position.x || 0),
+                y: n.position.y + (deletedNode?.position.y || 0),
+              },
+            };
+          }
+          return n;
+        }),
       edges: get().edges.filter((e) => e.source !== id && e.target !== id),
       selectedNodeId: get().selectedNodeId === id ? null : get().selectedNodeId,
     });
@@ -279,6 +359,86 @@ export const useFlowStore = create<FlowState>((set, get) => ({
         errorMessage: err instanceof Error ? err.message : String(err),
       });
     }
+  },
+
+  uploadFileToNewNode: (file, position) => {
+    // Determine template based on file type
+    let templateLabel = 'Upload';
+    if (file.type.startsWith('image/')) templateLabel = 'Image';
+    else if (file.type.startsWith('video/')) templateLabel = 'Video';
+
+    // Create the node
+    get().addNode('import', templateLabel, position);
+
+    // Get the newly created node (last selected)
+    const nodeId = get().selectedNodeId;
+    if (!nodeId) return;
+
+    const store = get();
+    const localUrl = URL.createObjectURL(file);
+    store.updateNodeSetting(nodeId, 'fileName', file.name);
+    store.updateNodeSetting(nodeId, 'fileUrl', localUrl);
+    store.updateNodeSetting(nodeId, 'fileType', file.type);
+    store.updateNodeSetting(nodeId, 'uploading', true);
+
+    fetch('/api/fal/upload', {
+      method: 'POST',
+      body: (() => { const fd = new FormData(); fd.append('file', file); return fd; })(),
+    })
+      .then((res) => { if (!res.ok) throw new Error('Upload failed'); return res.json(); })
+      .then((json) => {
+        if (json.url) {
+          const s = useFlowStore.getState();
+          s.updateNodeSetting(nodeId, 'remoteUrl', json.url);
+          URL.revokeObjectURL(localUrl);
+          s.updateNodeSetting(nodeId, 'fileUrl', json.url);
+        }
+      })
+      .catch((err) => console.error('Upload error:', err))
+      .finally(() => {
+        useFlowStore.getState().updateNodeSetting(nodeId, 'uploading', false);
+      });
+  },
+
+  pushUndo: () => {
+    const { nodes, edges, undoStack } = get();
+    const snapshot: Snapshot = {
+      nodes: JSON.parse(JSON.stringify(nodes)),
+      edges: JSON.parse(JSON.stringify(edges)),
+    };
+    set({ undoStack: [...undoStack.slice(-49), snapshot], redoStack: [] });
+  },
+
+  undo: () => {
+    const { undoStack, nodes, edges } = get();
+    if (undoStack.length === 0) return;
+    const prev = undoStack[undoStack.length - 1];
+    const currentSnapshot: Snapshot = {
+      nodes: JSON.parse(JSON.stringify(nodes)),
+      edges: JSON.parse(JSON.stringify(edges)),
+    };
+    set({
+      nodes: prev.nodes,
+      edges: prev.edges,
+      undoStack: undoStack.slice(0, -1),
+      redoStack: [...get().redoStack, currentSnapshot],
+    });
+  },
+
+  redo: () => {
+    const { redoStack, nodes, edges } = get();
+    if (redoStack.length === 0) return;
+    const next = redoStack[redoStack.length - 1];
+    const currentSnapshot: Snapshot = {
+      nodes: JSON.parse(JSON.stringify(nodes)),
+      edges: JSON.parse(JSON.stringify(edges)),
+    };
+    set({
+      nodes: next.nodes,
+      edges: next.edges,
+      redoStack: redoStack.slice(0, -1),
+      undoStack: [...get().undoStack, currentSnapshot],
+    });
   },
 
   toJSON: () => {

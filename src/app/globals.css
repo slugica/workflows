@@ -21,16 +21,6 @@ body {
 }
 
 /* React Flow dark theme overrides */
-.react-flow__controls button {
-  background-color: #171717 !important;
-  border-color: #212121 !important;
-  color: #a1a1aa !important;
-}
-
-.react-flow__controls button:hover {
-  background-color: #212121 !important;
-}
-
 .react-flow__minimap {
   background-color: #171717 !important;
 }
@@ -93,4 +83,9 @@ body {
 /* Node transitions */
 .react-flow__node {
   transition: box-shadow 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Default cursor: arrow for selection mode, let React Flow handle grab when panning */
+.react-flow__pane.selection {
+  cursor: default !important;
 }

@@ -1,10 +1,10 @@
 'use client';
 
-import { useState, type ReactNode } from 'react';
+import { useState, useRef, type ReactNode } from 'react';
 import { useReactFlow } from '@xyflow/react';
 import { NODE_TEMPLATES, FlowNodeType } from '@/lib/types';
 import { useFlowStore } from '@/store/flowStore';
-import { Upload, Type, ImageIcon, Video, AudioLines, Bot, Zap, Pencil, Search, Wrench, MessageSquare, Crop, Download, ScanLine, Droplets, Scaling, SlidersHorizontal, Settings2, Grid2x2, IterationCcw, Sun, Camera } from 'lucide-react';
+import { Upload, Type, ImageIcon, Video, AudioLines, Bot, Zap, Pencil, Search, Wrench, Crop, Download, ScanLine, Droplets, Scaling, SlidersHorizontal, Settings2, Grid2x2, IterationCcw, Sun, Camera } from 'lucide-react';
 
 // ── Quick-add buttons (top section) ──────────────────────────────────────────
 
@@ -13,7 +13,6 @@ const QUICK_ADD: { label: string; type: FlowNodeType; templateLabel: string; ico
   { label: 'Prompt', type: 'prompt', templateLabel: 'Prompt', icon: <Type size={14} />, shortcut: 'P' },
   { label: 'Image', type: 'import', templateLabel: 'Image', icon: <ImageIcon size={14} />, shortcut: 'I' },
   { label: 'Video', type: 'import', templateLabel: 'Video', icon: <Video size={14} />, shortcut: 'V' },
-  { label: 'AI Copilot', type: 'textUtility', templateLabel: 'AI Copilot', icon: <Bot size={14} />, shortcut: 'C' },
 ];
 
 // ── Sidebar structure: sections → subcategories → models ─────────────────────
@@ -51,19 +50,15 @@ const SECTIONS: Section[] = [
       { label: 'Generate Video', icon: <Video size={14} />, categories: ['Video Generation'] },
     ],
   },
-  {
-    label: 'Text',
-    subs: [
-      { label: 'Text', icon: <MessageSquare size={14} />, categories: ['Text'] },
-    ],
-  },
 ];
 
 export function Sidebar() {
   const [searchQuery, setSearchQuery] = useState('');
   const [openSubs, setOpenSubs] = useState<Set<string>>(new Set());
   const addNode = useFlowStore((s) => s.addNode);
+  const uploadFileToNewNode = useFlowStore((s) => s.uploadFileToNewNode);
   const { screenToFlowPosition } = useReactFlow();
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const toggleSub = (label: string) => {
     setOpenSubs((prev) => {
@@ -81,6 +76,11 @@ export function Sidebar() {
   };
 
   const handleAdd = (type: FlowNodeType, label: string) => {
+    // Upload button opens file picker instead of creating empty node
+    if (type === 'import' && label === 'Upload') {
+      fileInputRef.current?.click();
+      return;
+    }
     const center = screenToFlowPosition({
       x: window.innerWidth / 2,
       y: window.innerHeight / 2,
@@ -91,6 +91,17 @@ export function Sidebar() {
     });
   };
 
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const center = screenToFlowPosition({
+      x: window.innerWidth / 2,
+      y: window.innerHeight / 2,
+    });
+    uploadFileToNewNode(file, center);
+    e.target.value = '';
+  };
+
   // Search mode: flat list of all matching templates
   if (searchQuery.trim()) {
     const q = searchQuery.toLowerCase();
@@ -99,6 +110,7 @@ export function Sidebar() {
     );
     return (
       <div className="w-[280px] bg-[#0F0F0F] border-r border-[#212121] flex flex-col h-full">
+        <input ref={fileInputRef} type="file" className="hidden" accept="image/*,video/*" onChange={handleFileChange} />
         <Header searchQuery={searchQuery} setSearchQuery={setSearchQuery} />
         <div className="flex-1 overflow-y-auto p-2 space-y-0.5">
           {results.map((t) => (
@@ -121,6 +133,7 @@ export function Sidebar() {
 
   return (
     <div className="w-[280px] bg-[#0F0F0F] border-r border-[#212121] flex flex-col h-full">
+      <input ref={fileInputRef} type="file" className="hidden" accept="image/*,video/*" onChange={handleFileChange} />
       <Header searchQuery={searchQuery} setSearchQuery={setSearchQuery} />
 
       <div className="flex-1 overflow-y-auto">

@@ -45,7 +45,7 @@ export interface ModelDef {
   id: string;
   title: string;
   category: 'Image Generation' | 'Image Editing' | 'Upscale' | 'Video Generation' | 'Video Editing' | 'Audio' | 'Utility';
-  nodeType: 'image' | 'video' | 'audio' | 'textUtility';
+  nodeType: 'image' | 'video' | 'audio';
   inputs: HandleMapping[];
   outputs: HandleMapping[];
   settings: SettingDef[];
