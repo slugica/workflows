@@ -36,7 +36,7 @@ export interface FlowNodeData {
   errorMessage?: string;
 }
 
-export type FlowNodeType = 'import' | 'prompt' | 'image' | 'video' | 'audio' | 'textUtility' | 'crop' | 'export' | 'preview' | 'blur' | 'resize' | 'filters' | 'levels' | 'splitImage' | 'imageIterator' | 'aiResize';
+export type FlowNodeType = 'import' | 'prompt' | 'image' | 'video' | 'audio' | 'textUtility' | 'crop' | 'export' | 'preview' | 'blur' | 'resize' | 'filters' | 'levels' | 'splitImage' | 'imageIterator' | 'aiResize' | 'relight';
 
 export interface NodeTemplate {
   type: FlowNodeType;
@@ -210,6 +210,19 @@ const STATIC_TEMPLATES: NodeTemplate[] = [
         outputs: [{ id: '', key: 'image', label: 'Image', type: 'image' }],
       },
       settings: { aspectRatio: '1:1' },
+    },
+  },
+  {
+    type: 'relight',
+    label: 'Relight',
+    category: 'Image Editing',
+    defaultData: {
+      behavior: 'static',
+      handles: {
+        inputs: [{ id: '', key: 'imageUrl', label: 'Reference Image', type: 'image', required: true }],
+        outputs: [{ id: '', key: 'image', label: 'Image', type: 'image' }],
+      },
+      settings: { azimuth: 0, elevation: 0, lightIntensity: 7, colorHex: '#ffffff', aspectRatio: '3:4', resolution: '1K' },
     },
   },
   {
