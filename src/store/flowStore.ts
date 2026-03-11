@@ -81,14 +81,11 @@ export const useFlowStore = create<FlowState>((set, get) => ({
             }
           }
           if (changed) {
-            const nonGroup = newInputs.filter((h: HandleDef) => h.dynamicBase !== base);
-            // Insert kept handles at the position of the first group handle
+            // Rebuild: keep non-group handles in order, insert kept group handles where the group started
             const firstGroupIdx = newInputs.findIndex((h: HandleDef) => h.dynamicBase === base);
-            newInputs = [
-              ...nonGroup.slice(0, firstGroupIdx),
-              ...toKeep,
-              ...nonGroup.slice(firstGroupIdx),
-            ];
+            const before = newInputs.filter((h: HandleDef, i: number) => i < firstGroupIdx && h.dynamicBase !== base);
+            const after = newInputs.filter((h: HandleDef, i: number) => i > firstGroupIdx && h.dynamicBase !== base);
+            newInputs = [...before, ...toKeep, ...after];
           }
         }
         if (!changed) return n;

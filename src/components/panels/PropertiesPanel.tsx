@@ -6,6 +6,31 @@ import { FlowNodeData } from '@/lib/types';
 import { getModelById, type SettingDef } from '@/lib/modelRegistry';
 import { Sun, Camera } from 'lucide-react';
 
+function HexColorInput({ value, onChange }: { value: string; onChange: (val: string) => void }) {
+  const [draft, setDraft] = useState(value);
+  const [focused, setFocused] = useState(false);
+  const displayed = focused ? draft : value;
+  return (
+    <input
+      type="text"
+      value={displayed}
+      className="flex-1 bg-[#171717] text-zinc-300 text-xs rounded-lg px-3 py-2 border border-[#212121] focus:outline-none uppercase"
+      onFocus={() => { setDraft(value); setFocused(true); }}
+      onBlur={() => {
+        setFocused(false);
+        if (/^#[0-9a-fA-F]{6}$/.test(draft)) onChange(draft);
+      }}
+      onChange={(e) => {
+        const val = e.target.value;
+        if (/^#?[0-9a-fA-F]{0,6}$/.test(val) || val === '') {
+          setDraft(val.startsWith('#') ? val : `#${val}`);
+          if (/^#[0-9a-fA-F]{6}$/.test(val)) onChange(val);
+        }
+      }}
+    />
+  );
+}
+
 function SettingControl({
   def,
   value,
@@ -463,18 +488,9 @@ function RelightProperties({ nodeId, settings }: { nodeId: string; settings: Rec
             />
             <div className="w-full h-full" style={{ backgroundColor: colorHex }} />
           </div>
-          <input
-            type="text"
+          <HexColorInput
             value={colorHex}
-            className="flex-1 bg-[#171717] text-zinc-300 text-xs rounded-lg px-3 py-2 border border-[#212121] focus:outline-none uppercase"
-            onChange={(e) => {
-              const val = e.target.value;
-              if (/^#[0-9a-fA-F]{0,6}$/.test(val) || val === '') {
-                if (/^#[0-9a-fA-F]{6}$/.test(val)) {
-                  updateNodeSetting(nodeId, 'colorHex', val);
-                }
-              }
-            }}
+            onChange={(val) => updateNodeSetting(nodeId, 'colorHex', val)}
           />
         </div>
       </div>

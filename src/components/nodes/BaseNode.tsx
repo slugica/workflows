@@ -106,9 +106,9 @@ export function BaseNode(props: NodeProps) {
             }}
           />
         </div>
-        {data.settings.modelId ? (
+        {typeof data.settings.modelId === 'string' && data.settings.modelId ? (
           <span className="text-[11px] text-white/50">
-            {String(data.settings.modelId).split('/').pop()}
+            {data.settings.modelId.split('/').pop()}
           </span>
         ) : null}
       </div>

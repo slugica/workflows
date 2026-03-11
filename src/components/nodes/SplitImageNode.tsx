@@ -160,8 +160,8 @@ export function SplitImageNode(props: NodeProps) {
         const ctx = canvas.getContext('2d');
         if (!ctx) throw new Error('Canvas context unavailable');
         ctx.drawImage(image, c * cellW, r * cellH, cellW, cellH, 0, 0, cellW, cellH);
-        const blob = await new Promise<Blob>((resolve) =>
-          canvas.toBlob((b) => resolve(b!), 'image/png')
+        const blob = await new Promise<Blob>((resolve, reject) =>
+          canvas.toBlob((b) => b ? resolve(b) : reject(new Error('Failed to create blob')), 'image/png')
         );
         blobs.push(blob);
       }
