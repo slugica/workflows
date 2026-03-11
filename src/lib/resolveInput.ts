@@ -26,6 +26,19 @@ export function resolveInputImageUrl(
   }
 
   if (sourceData.results && sourceData.results.length > 0) {
+    // Parse source handle key (e.g. "nodeId|output:image:split_4" → "split_4")
+    const sourceHandleKey = incomingEdge.sourceHandle?.split(':').pop();
+
+    // Try to find a result matching the specific source handle key
+    if (sourceHandleKey) {
+      for (const result of sourceData.results) {
+        if (result[sourceHandleKey]?.content) {
+          return result[sourceHandleKey].content;
+        }
+      }
+    }
+
+    // Fallback: use selectedResultIndex (for single-output nodes like AI)
     const result = sourceData.results[sourceData.selectedResultIndex || 0];
     if (result) {
       const entry = Object.values(result)[0];

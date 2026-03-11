@@ -73,6 +73,23 @@ body {
   border-radius: 1px !important;
 }
 
+/* Shimmer loading animation */
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+.shimmer {
+  background: linear-gradient(
+    90deg,
+    #1a1a1a 25%,
+    #2a2a2a 37%,
+    #1a1a1a 63%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.8s ease-in-out infinite;
+}
+
 /* Node transitions */
 .react-flow__node {
   transition: box-shadow 0.3s cubic-bezier(0.4, 0, 0.2, 1);

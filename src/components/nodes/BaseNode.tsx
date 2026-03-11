@@ -77,6 +77,7 @@ export function BaseNode(props: NodeProps) {
       const json = await res.json();
       if (json.url) {
         store.updateNodeSetting(id, 'remoteUrl', json.url);
+        URL.revokeObjectURL(localUrl);
         store.updateNodeSetting(id, 'fileUrl', json.url);
       } else {
         console.error('Upload failed:', json.error);
@@ -219,11 +220,23 @@ export function BaseNode(props: NodeProps) {
               }}
             />
             {data.settings.fileUrl ? (
-              <div
-                className="relative bg-[#212121] rounded-2xl overflow-hidden"
-                style={contentSize ? { width: contentSize.w, height: contentSize.h } : undefined}
-              >
-                {(data.settings.fileType as string)?.startsWith('video/') ? (
+              <>
+                {/* Hidden image to get natural dimensions during upload */}
+                {data.settings.uploading && !(data.settings.fileType as string)?.startsWith('video/') && (
+                  <img
+                    src={data.settings.fileUrl as string}
+                    alt=""
+                    className="hidden"
+                    onLoad={(e) => setImgNatural({ w: e.currentTarget.naturalWidth, h: e.currentTarget.naturalHeight })}
+                  />
+                )}
+                <div
+                  className="relative bg-[#212121] rounded-2xl overflow-hidden"
+                  style={contentSize ? { width: contentSize.w, height: contentSize.h } : undefined}
+                >
+                {data.settings.uploading ? (
+                  <div className="shimmer w-full h-full" style={!contentSize ? { aspectRatio: '1' } : undefined} />
+                ) : (data.settings.fileType as string)?.startsWith('video/') ? (
                   <video
                     src={data.settings.fileUrl as string}
                     className="w-full h-full object-cover"
@@ -237,10 +250,8 @@ export function BaseNode(props: NodeProps) {
                     onLoad={(e) => setImgNatural({ w: e.currentTarget.naturalWidth, h: e.currentTarget.naturalHeight })}
                   />
                 )}
-                {data.settings.uploading ? (
-                  <div className="absolute bottom-2 left-2 text-[10px] text-yellow-400">Uploading...</div>
-                ) : null}
               </div>
+              </>
             ) : (
               <label
                 htmlFor={`file-input-${id}`}
@@ -260,19 +271,17 @@ export function BaseNode(props: NodeProps) {
         ) : null}
 
         {/* Status */}
-        {data.status === 'running' ? (
-          <div className="mt-2 flex items-center gap-1">
-            <div className="w-2 h-2 rounded-full bg-yellow-400 animate-pulse" />
-            <span className="text-[10px] text-yellow-400">Processing...</span>
-          </div>
-        ) : null}
         {data.status === 'error' && data.errorMessage ? (
           <div className="mt-2 text-[10px] text-red-400 truncate self-stretch" title={data.errorMessage}>{data.errorMessage}</div>
         ) : null}
 
-        {/* Result placeholder or preview */}
+        {/* Result placeholder or shimmer loading */}
         {data.behavior === 'dynamic' && (!data.results || data.results.length === 0) ? (
-          <div className="self-stretch bg-[#212121] rounded-2xl overflow-hidden h-[320px] checkerboard" />
+          data.status === 'running' ? (
+            <div className="self-stretch bg-[#212121] rounded-2xl overflow-hidden h-[320px] shimmer" />
+          ) : (
+            <div className="self-stretch bg-[#212121] rounded-2xl overflow-hidden h-[320px] checkerboard" />
+          )
         ) : null}
         {data.results && data.results.length > 0 ? (
           <div className="self-stretch">
