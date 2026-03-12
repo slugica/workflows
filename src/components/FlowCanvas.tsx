@@ -16,7 +16,7 @@ import {
   type Edge,
   type Connection,
   type ConnectionLineComponentProps,
-  getSmoothStepPath,
+  getBezierPath,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 import { useFlowStore } from '@/store/flowStore';
@@ -36,16 +36,16 @@ import { CameraAnglesNode } from '@/components/nodes/CameraAnglesNode';
 import { SectionNode } from '@/components/nodes/SectionNode';
 import { FlowNodeType, HANDLE_COLORS, type FlowNodeData } from '@/lib/types';
 
-function CustomConnectionLine({ fromX, fromY, toX, toY, fromNode, fromHandle }: ConnectionLineComponentProps) {
+function CustomConnectionLine({ fromX, fromY, toX, toY, fromPosition, toPosition, fromNode, fromHandle }: ConnectionLineComponentProps) {
   const handleId = fromHandle?.id || '';
   const nodeData = fromNode?.data as unknown as FlowNodeData | undefined;
   const handle = nodeData?.handles.outputs.find(h => h.id === handleId)
     || nodeData?.handles.inputs.find(h => h.id === handleId);
   const color = handle ? HANDLE_COLORS[handle.type] : '#52525b';
 
-  const [path] = getSmoothStepPath({
-    sourceX: fromX, sourceY: fromY,
-    targetX: toX, targetY: toY,
+  const [path] = getBezierPath({
+    sourceX: fromX, sourceY: fromY, sourcePosition: fromPosition,
+    targetX: toX, targetY: toY, targetPosition: toPosition,
   });
 
   return <path d={path} fill="none" stroke={color} strokeWidth={2} />;
@@ -109,11 +109,11 @@ function BottomBar() {
   // Keyboard shortcuts for undo/redo
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
-      if ((e.ctrlKey || e.metaKey) && e.key === 'z' && !e.shiftKey) {
+      if ((e.ctrlKey || e.metaKey) && e.code === 'KeyZ' && !e.shiftKey) {
         e.preventDefault();
         undo();
       }
-      if ((e.ctrlKey || e.metaKey) && (e.key === 'y' || (e.key === 'z' && e.shiftKey))) {
+      if ((e.ctrlKey || e.metaKey) && (e.code === 'KeyY' || (e.code === 'KeyZ' && e.shiftKey))) {
         e.preventDefault();
         redo();
       }
@@ -533,7 +533,7 @@ export function FlowCanvas() {
         fitViewOptions={{ maxZoom: 1 }}
         colorMode="dark"
         defaultEdgeOptions={{
-          type: 'smoothstep',
+          type: 'default',
           animated: false,
           style: { strokeWidth: 2 },
         }}

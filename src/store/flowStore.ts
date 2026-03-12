@@ -137,7 +137,7 @@ export const useFlowStore = create<FlowState>((set, get) => ({
     const newEdge: Edge = {
       ...connection,
       id: `${connection.source}-${connection.target}-${generateId()}`,
-      type: 'smoothstep',
+      type: 'default',
       style: { stroke: edgeColor, strokeWidth: 2 },
     };
     const newEdges = addEdge(newEdge, filteredEdges);
