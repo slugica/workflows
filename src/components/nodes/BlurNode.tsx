@@ -3,7 +3,7 @@
 import { useRef, useMemo, useState, useEffect } from 'react';
 import { Handle, Position, useEdges, useNodes, type NodeProps } from '@xyflow/react';
 import { FlowNodeData, HANDLE_COLORS } from '@/lib/types';
-import { resolveInputImageUrl } from '@/lib/resolveInput';
+import { resolveInput } from '@/lib/resolveInput';
 import { useFlowStore } from '@/store/flowStore';
 import { Droplets } from 'lucide-react';
 
@@ -69,6 +69,8 @@ export function BlurNode(props: NodeProps) {
   const allNodes = useNodes();
   const edges = useEdges();
   const imgRef = useRef<HTMLImageElement>(null);
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const prevBlobUrlRef = useRef<string | null>(null);
 
   const connectedHandles = useMemo(() => {
     const set = new Set<string>();
@@ -79,7 +81,12 @@ export function BlurNode(props: NodeProps) {
     return set;
   }, [edges, id]);
 
-  const inputImageUrl = resolveInputImageUrl(id, allNodes, edges);
+  const resolved = resolveInput(id, allNodes, edges);
+  const inputUrl = resolved?.url ?? null;
+  const isVideo = resolved?.mediaType === 'video';
+
+  // Cleanup blob URL on unmount
+  useEffect(() => () => { if (prevBlobUrlRef.current) URL.revokeObjectURL(prevBlobUrlRef.current); }, []);
 
   const [blurType, setBlurType] = useState<string>('gaussian');
   const [blurSize, setBlurSize] = useState<number>(5);
@@ -96,8 +103,19 @@ export function BlurNode(props: NodeProps) {
     return { w: Math.round(cw), h: Math.round(ch) };
   }, [imgNatural]);
 
-  // Apply blur to canvas — runs on committed values only (slider release, type change, new image)
+  // Video path: pass through URL immediately
   useEffect(() => {
+    if (!inputUrl || !isVideo) return;
+    useFlowStore.getState().updateNodeData(id, {
+      status: 'done',
+      results: [{ file: { content: inputUrl, format: 'video' } }],
+      selectedResultIndex: 0,
+    });
+  }, [id, inputUrl, isVideo]);
+
+  // Image path: existing canvas blur logic
+  useEffect(() => {
+    if (!inputUrl || isVideo) return;
     if (!imgRef.current || !imgNatural) return;
 
     const image = imgRef.current;
@@ -108,7 +126,7 @@ export function BlurNode(props: NodeProps) {
     if (committedSize === 0) {
       useFlowStore.getState().updateNodeData(id, {
         status: 'done',
-        results: [{ file: { content: inputImageUrl!, format: 'image' } }],
+        results: [{ file: { content: inputUrl, format: 'image' } }],
         selectedResultIndex: 0,
       });
       return;
@@ -143,14 +161,16 @@ export function BlurNode(props: NodeProps) {
 
     canvas.toBlob((blob) => {
       if (!blob) return;
+      if (prevBlobUrlRef.current) URL.revokeObjectURL(prevBlobUrlRef.current);
       const url = URL.createObjectURL(blob);
+      prevBlobUrlRef.current = url;
       useFlowStore.getState().updateNodeData(id, {
         status: 'done',
         results: [{ file: { content: url, format: 'image' } }],
         selectedResultIndex: 0,
       });
     }, 'image/png');
-  }, [id, inputImageUrl, blurType, committedSize, imgNatural]);
+  }, [id, inputUrl, isVideo, blurType, committedSize, imgNatural]);
 
   const resultUrl = data.results?.[0]
     ? Object.values(data.results[0])[0]?.content
@@ -252,28 +272,51 @@ export function BlurNode(props: NodeProps) {
 
         {/* Content */}
         <div className="self-stretch">
-          {inputImageUrl ? (
+          {inputUrl ? (
             <div className="flex flex-col gap-0">
-              {/* Hidden source image for canvas processing */}
-              <img
-                ref={imgRef}
-                src={inputImageUrl}
-                alt=""
-                className="hidden"
-                crossOrigin="anonymous"
-                onLoad={(e) => setImgNatural({ w: e.currentTarget.naturalWidth, h: e.currentTarget.naturalHeight })}
-              />
+              {/* Hidden source elements for dimension detection */}
+              {!isVideo ? (
+                <img
+                  ref={imgRef}
+                  src={inputUrl}
+                  alt=""
+                  className="hidden"
+                  crossOrigin="anonymous"
+                  onLoad={(e) => setImgNatural({ w: e.currentTarget.naturalWidth, h: e.currentTarget.naturalHeight })}
+                />
+              ) : (
+                <video
+                  ref={videoRef}
+                  src={inputUrl}
+                  className="hidden"
+                  onLoadedMetadata={(e) => {
+                    const v = e.currentTarget;
+                    setImgNatural({ w: v.videoWidth, h: v.videoHeight });
+                  }}
+                />
+              )}
 
               {/* Show result or original */}
               <div
-                className="bg-[#212121] rounded-2xl overflow-hidden"
+                className="relative bg-[#212121] rounded-2xl overflow-hidden"
                 style={contentSize ? { width: contentSize.w, height: contentSize.h } : undefined}
               >
-                <img
-                  src={resultUrl || inputImageUrl}
-                  alt="Blur result"
-                  className="w-full h-full object-cover"
-                />
+                {isVideo ? (
+                  <video
+                    src={inputUrl}
+                    controls
+                    muted
+                    loop
+                    className="w-full h-full object-cover nodrag"
+                    style={{ filter: `blur(${committedSize}px)` }}
+                  />
+                ) : (
+                  <img
+                    src={resultUrl || inputUrl}
+                    alt="Blur result"
+                    className="w-full h-full object-cover"
+                  />
+                )}
               </div>
 
               {/* Controls */}
@@ -303,7 +346,7 @@ export function BlurNode(props: NodeProps) {
             </div>
           ) : (
             <div className="h-[320px] bg-[#212121] rounded-2xl checkerboard flex items-center justify-center">
-              <span className="text-zinc-500 text-sm">Connect an image input</span>
+              <span className="text-zinc-500 text-sm">Connect a file input</span>
             </div>
           )}
         </div>

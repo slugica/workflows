@@ -3,7 +3,7 @@
 import { useRef, useMemo, useState, useEffect } from 'react';
 import { Handle, Position, useEdges, useNodes, type NodeProps } from '@xyflow/react';
 import { FlowNodeData, HANDLE_COLORS } from '@/lib/types';
-import { resolveInputImageUrl } from '@/lib/resolveInput';
+import { resolveInput } from '@/lib/resolveInput';
 import { useFlowStore } from '@/store/flowStore';
 import { SlidersHorizontal, RotateCcw } from 'lucide-react';
 
@@ -41,6 +41,8 @@ export function FiltersNode(props: NodeProps) {
   const allNodes = useNodes();
   const edges = useEdges();
   const imgRef = useRef<HTMLImageElement>(null);
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const prevBlobUrlRef = useRef<string | null>(null);
 
   const connectedHandles = useMemo(() => {
     const set = new Set<string>();
@@ -51,7 +53,12 @@ export function FiltersNode(props: NodeProps) {
     return set;
   }, [edges, id]);
 
-  const inputImageUrl = resolveInputImageUrl(id, allNodes, edges);
+  const resolved = resolveInput(id, allNodes, edges);
+  const inputUrl = resolved?.url ?? null;
+  const isVideo = resolved?.mediaType === 'video';
+
+  // Cleanup blob URL on unmount
+  useEffect(() => () => { if (prevBlobUrlRef.current) URL.revokeObjectURL(prevBlobUrlRef.current); }, []);
 
   const [filters, setFilters] = useState<FilterValues>({ ...DEFAULT_FILTERS });
   const [committed, setCommitted] = useState<FilterValues>({ ...DEFAULT_FILTERS });
@@ -67,8 +74,19 @@ export function FiltersNode(props: NodeProps) {
     return { w: Math.round(cw), h: Math.round(ch) };
   }, [imgNatural]);
 
-  // Apply filters on committed values
+  // Video path: pass through URL immediately
   useEffect(() => {
+    if (!inputUrl || !isVideo) return;
+    useFlowStore.getState().updateNodeData(id, {
+      status: 'done',
+      results: [{ file: { content: inputUrl, format: 'video' } }],
+      selectedResultIndex: 0,
+    });
+  }, [id, inputUrl, isVideo]);
+
+  // Image path: existing canvas + pixel manipulation logic
+  useEffect(() => {
+    if (!inputUrl || isVideo) return;
     if (!imgRef.current || !imgNatural) return;
 
     const image = imgRef.current;
@@ -81,7 +99,7 @@ export function FiltersNode(props: NodeProps) {
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
-    // CSS filters: -100→0, 0→1, +100→2
+    // CSS filters: -100->0, 0->1, +100->2
     const brightness = 1 + committed.exposure / 100;
     const contrast = 1 + committed.contrast / 100;
     const saturate = 1 + committed.saturation / 100;
@@ -130,14 +148,16 @@ export function FiltersNode(props: NodeProps) {
 
     canvas.toBlob((blob) => {
       if (!blob) return;
+      if (prevBlobUrlRef.current) URL.revokeObjectURL(prevBlobUrlRef.current);
       const url = URL.createObjectURL(blob);
+      prevBlobUrlRef.current = url;
       useFlowStore.getState().updateNodeData(id, {
         status: 'done',
         results: [{ file: { content: url, format: 'image' } }],
         selectedResultIndex: 0,
       });
     }, 'image/png');
-  }, [id, inputImageUrl, committed, imgNatural]);
+  }, [id, inputUrl, isVideo, committed, imgNatural]);
 
   const resultUrl = data.results?.[0]
     ? Object.values(data.results[0])[0]?.content
@@ -147,6 +167,9 @@ export function FiltersNode(props: NodeProps) {
     setFilters({ ...DEFAULT_FILTERS });
     setCommitted({ ...DEFAULT_FILTERS });
   };
+
+  // CSS filter string for video preview
+  const videoCssFilter = `brightness(${1 + committed.exposure / 100}) contrast(${1 + committed.contrast / 100}) saturate(${1 + committed.saturation / 100})`;
 
   return (
     <div
@@ -244,28 +267,52 @@ export function FiltersNode(props: NodeProps) {
 
         {/* Content */}
         <div className="self-stretch">
-          {inputImageUrl ? (
+          {inputUrl ? (
             <>
-              {/* Hidden source image */}
-              <img
-                ref={imgRef}
-                src={inputImageUrl}
-                alt=""
-                className="hidden"
-                crossOrigin="anonymous"
-                onLoad={(e) => setImgNatural({ w: e.currentTarget.naturalWidth, h: e.currentTarget.naturalHeight })}
-              />
+              {/* Hidden source element for dimensions */}
+              {isVideo ? (
+                <video
+                  ref={videoRef}
+                  src={inputUrl}
+                  className="hidden"
+                  crossOrigin="anonymous"
+                  onLoadedMetadata={(e) => {
+                    const v = e.currentTarget;
+                    setImgNatural({ w: v.videoWidth, h: v.videoHeight });
+                  }}
+                />
+              ) : (
+                <img
+                  ref={imgRef}
+                  src={inputUrl}
+                  alt=""
+                  className="hidden"
+                  crossOrigin="anonymous"
+                  onLoad={(e) => setImgNatural({ w: e.currentTarget.naturalWidth, h: e.currentTarget.naturalHeight })}
+                />
+              )}
 
               {/* Preview */}
               <div
-                className="bg-[#212121] rounded-2xl overflow-hidden"
+                className="relative bg-[#212121] rounded-2xl overflow-hidden"
                 style={contentSize ? { width: contentSize.w, height: contentSize.h } : undefined}
               >
-                <img
-                  src={resultUrl || inputImageUrl}
-                  alt="Filters result"
-                  className="w-full h-full object-cover"
-                />
+                {isVideo ? (
+                  <video
+                    src={inputUrl}
+                    controls
+                    muted
+                    loop
+                    className="w-full h-full object-cover nodrag"
+                    style={{ filter: videoCssFilter }}
+                  />
+                ) : (
+                  <img
+                    src={resultUrl || inputUrl}
+                    alt="Filters result"
+                    className="w-full h-full object-cover"
+                  />
+                )}
               </div>
             </>
           ) : (

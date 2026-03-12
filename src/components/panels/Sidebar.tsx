@@ -4,7 +4,7 @@ import { useState, useRef, type ReactNode } from 'react';
 import { useReactFlow } from '@xyflow/react';
 import { NODE_TEMPLATES, FlowNodeType } from '@/lib/types';
 import { useFlowStore } from '@/store/flowStore';
-import { Upload, Type, ImageIcon, Video, AudioLines, Bot, Zap, Pencil, Search, Wrench, Crop, Download, ScanLine, Droplets, Scaling, SlidersHorizontal, Settings2, Grid2x2, IterationCcw, Sun, Camera } from 'lucide-react';
+import { Upload, Type, ImageIcon, Video, AudioLines, Bot, Zap, Pencil, Search, Wrench, Crop, Download, ScanLine, Droplets, Scaling, SlidersHorizontal, Settings2, Grid2x2, IterationCcw, Sun, Camera, Film, Scissors, AudioWaveform, Combine } from 'lucide-react';
 
 // ── Quick-add buttons (top section) ──────────────────────────────────────────
 
@@ -41,13 +41,14 @@ const SECTIONS: Section[] = [
       { label: 'Generate Image', icon: <ImageIcon size={14} />, categories: ['Image Generation'] },
       { label: 'Edit Image', icon: <Pencil size={14} />, categories: ['Image Editing'] },
       { label: 'Enhance Image', icon: <Search size={14} />, categories: ['Upscale'] },
-      { label: 'Image Utility', icon: <Wrench size={14} />, categories: ['Utility'] },
+      { label: 'Image Utility', icon: <Wrench size={14} />, categories: ['Image Utility', 'Shared Utility'] },
     ],
   },
   {
     label: 'Video',
     subs: [
       { label: 'Generate Video', icon: <Video size={14} />, categories: ['Video Generation'] },
+      { label: 'Video Utility', icon: <Wrench size={14} />, categories: ['Video Utility', 'Shared Utility'] },
     ],
   },
 ];
@@ -304,7 +305,7 @@ function ModelItem({
       onClick={onAdd}
     >
       <span className="w-6 h-6 rounded-md bg-[#212121] flex items-center justify-center text-[11px] group-hover:bg-[#2a2a2a] transition-colors">
-        {type === 'image' ? <ImageIcon size={11} /> : type === 'video' ? <Video size={11} /> : type === 'audio' ? <AudioLines size={11} /> : type === 'prompt' ? <Type size={11} /> : type === 'import' ? <Upload size={11} /> : type === 'crop' ? <Crop size={11} /> : type === 'export' ? <Download size={11} /> : type === 'preview' ? <ScanLine size={11} /> : type === 'blur' ? <Droplets size={11} /> : type === 'resize' ? <Scaling size={11} /> : type === 'filters' ? <SlidersHorizontal size={11} /> : type === 'levels' ? <Settings2 size={11} /> : type === 'splitImage' ? <Grid2x2 size={11} /> : type === 'imageIterator' ? <IterationCcw size={11} /> : type === 'aiResize' ? <Scaling size={11} /> : type === 'relight' ? <Sun size={11} /> : type === 'cameraAngles' ? <Camera size={11} /> : <Bot size={11} />}
+        {type === 'image' ? <ImageIcon size={11} /> : type === 'video' ? <Video size={11} /> : type === 'audio' ? <AudioLines size={11} /> : type === 'prompt' ? <Type size={11} /> : type === 'import' ? <Upload size={11} /> : type === 'crop' ? <Crop size={11} /> : type === 'export' ? <Download size={11} /> : type === 'preview' ? <ScanLine size={11} /> : type === 'blur' ? <Droplets size={11} /> : type === 'resize' ? <Scaling size={11} /> : type === 'filters' ? <SlidersHorizontal size={11} /> : type === 'levels' ? <Settings2 size={11} /> : type === 'splitImage' ? <Grid2x2 size={11} /> : type === 'imageIterator' ? <IterationCcw size={11} /> : type === 'aiResize' ? <Scaling size={11} /> : type === 'relight' ? <Sun size={11} /> : type === 'cameraAngles' ? <Camera size={11} /> : type === 'extractFrame' ? <Film size={11} /> : type === 'trimVideo' ? <Scissors size={11} /> : type === 'combineAudioVideo' ? <AudioWaveform size={11} /> : type === 'combineVideo' ? <Combine size={11} /> : type === 'videoIterator' ? <IterationCcw size={11} /> : <Bot size={11} />}
       </span>
       <div className="flex-1 min-w-0">
         <div className="text-[13px] text-zinc-300 truncate">{label}</div>

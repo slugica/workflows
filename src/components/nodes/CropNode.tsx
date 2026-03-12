@@ -5,7 +5,7 @@ import { Handle, Position, useEdges, useNodes, useReactFlow, type NodeProps } fr
 import ReactCrop, { type Crop, type PixelCrop } from 'react-image-crop';
 import 'react-image-crop/dist/ReactCrop.css';
 import { FlowNodeData, HANDLE_COLORS } from '@/lib/types';
-import { resolveInputImageUrl } from '@/lib/resolveInput';
+import { resolveInput } from '@/lib/resolveInput';
 import { useFlowStore } from '@/store/flowStore';
 import { Crop as CropIcon, Link, Unlink } from 'lucide-react';
 
@@ -25,6 +25,10 @@ export function CropNode(props: NodeProps) {
   const allNodes = useNodes();
   const edges = useEdges();
   const imgRef = useRef<HTMLImageElement>(null);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const rafRef = useRef<number>(0);
+  const prevBlobUrlRef = useRef<string | null>(null);
   const { getZoom } = useReactFlow();
 
   const connectedHandles = useMemo(() => {
@@ -36,48 +40,142 @@ export function CropNode(props: NodeProps) {
     return set;
   }, [edges, id]);
 
-  const inputImageUrl = resolveInputImageUrl(id, allNodes, edges);
+  const resolved = resolveInput(id, allNodes, edges);
+  const inputUrl = resolved?.url ?? null;
+  const isVideo = resolved?.mediaType === 'video';
 
   const [crop, setCrop] = useState<Crop>();
   const [completedCrop, setCompletedCrop] = useState<PixelCrop | null>(null);
   const [aspectRatioIdx, setAspectRatioIdx] = useState(0);
   const [lockedRatio, setLockedRatio] = useState<number | null>(null);
+  const [videoSize, setVideoSize] = useState<{ w: number; h: number } | null>(null);
+  const restoredRef = useRef(false);
+
+  // Cleanup blob URL on unmount
+  useEffect(() => () => { if (prevBlobUrlRef.current) URL.revokeObjectURL(prevBlobUrlRef.current); }, []);
 
   useEffect(() => {
     setCrop(undefined);
     setCompletedCrop(null);
-  }, [inputImageUrl]);
+    setVideoSize(null);
+    restoredRef.current = false;
+  }, [inputUrl]);
 
-  const onImageLoad = useCallback((e: React.SyntheticEvent<HTMLImageElement>) => {
-    const { width, height } = e.currentTarget;
-    const pad = 0.15; // 15% inset from each side → 70% of image
+  // Video: rAF loop to draw frames onto canvas (ReactCrop overlays on top)
+  const drawVideoFrame = useCallback(() => {
+    const video = videoRef.current;
+    const canvas = canvasRef.current;
+    if (!video || !canvas || video.readyState < 2) {
+      rafRef.current = requestAnimationFrame(drawVideoFrame);
+      return;
+    }
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    ctx.drawImage(video, 0, 0);
+    rafRef.current = requestAnimationFrame(drawVideoFrame);
+  }, []);
+
+  useEffect(() => {
+    if (!isVideo || !inputUrl) return;
+    rafRef.current = requestAnimationFrame(drawVideoFrame);
+    return () => { if (rafRef.current) cancelAnimationFrame(rafRef.current); };
+  }, [isVideo, inputUrl, drawVideoFrame]);
+
+  // Restore saved crop from settings, or use default 15% inset
+  const restoreCropForDisplay = useCallback((displayW: number, displayH: number, naturalW: number, naturalH: number) => {
+    const saved = data.settings as Record<string, unknown>;
+    if (saved.cropXPct != null && !restoredRef.current) {
+      restoredRef.current = true;
+      const restored: PixelCrop = {
+        x: (saved.cropXPct as number) * displayW,
+        y: (saved.cropYPct as number) * displayH,
+        width: (saved.cropWPct as number) * displayW,
+        height: (saved.cropHPct as number) * displayH,
+        unit: 'px',
+      };
+      setCrop(restored);
+      setCompletedCrop(restored);
+      return;
+    }
+    if (restoredRef.current) return;
+    restoredRef.current = true;
+    const pad = 0.15;
     const initialCrop: PixelCrop = {
-      x: Math.round(width * pad),
-      y: Math.round(height * pad),
-      width: Math.round(width * (1 - pad * 2)),
-      height: Math.round(height * (1 - pad * 2)),
+      x: Math.round(displayW * pad),
+      y: Math.round(displayH * pad),
+      width: Math.round(displayW * (1 - pad * 2)),
+      height: Math.round(displayH * (1 - pad * 2)),
       unit: 'px',
     };
     setCrop(initialCrop);
     setCompletedCrop(initialCrop);
+  }, [data.settings]);
+
+  // Set initial crop when image loads (for image mode)
+  const onImageLoad = useCallback((e: React.SyntheticEvent<HTMLImageElement>) => {
+    const { width, height, naturalWidth, naturalHeight } = e.currentTarget;
+    restoreCropForDisplay(width, height, naturalWidth, naturalHeight);
+  }, [restoreCropForDisplay]);
+
+  // Set initial crop when video metadata loads
+  const onVideoLoaded = useCallback(() => {
+    const video = videoRef.current;
+    const canvas = canvasRef.current;
+    if (!video || !canvas) return;
+    setVideoSize({ w: video.videoWidth, h: video.videoHeight });
   }, []);
+
+  // When videoSize is set, restore or calculate initial crop
+  useEffect(() => {
+    if (!videoSize || !canvasRef.current) return;
+    const canvas = canvasRef.current;
+    requestAnimationFrame(() => {
+      const { width, height } = canvas.getBoundingClientRect();
+      if (!width || !height) return;
+      restoreCropForDisplay(width, height, videoSize.w, videoSize.h);
+    });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [videoSize]);
 
   const presetAspect = ASPECT_RATIOS[aspectRatioIdx].value;
   const aspectRatio = presetAspect ?? (lockedRatio !== null ? lockedRatio : undefined);
 
+  // Get the reference element for dimension calculations
+  const getRefElement = () => isVideo ? canvasRef.current : imgRef.current;
+  const getNaturalSize = () => {
+    if (isVideo && videoSize) return { w: videoSize.w, h: videoSize.h };
+    if (!isVideo && imgRef.current) return { w: imgRef.current.naturalWidth, h: imgRef.current.naturalHeight };
+    return null;
+  };
+  const getDisplaySize = () => {
+    const el = getRefElement();
+    if (!el) return null;
+    if (isVideo) {
+      const rect = el.getBoundingClientRect();
+      return { w: rect.width, h: rect.height };
+    }
+    return { w: (el as HTMLImageElement).width, h: (el as HTMLImageElement).height };
+  };
+
   // Real pixel dimensions of the current crop
-  const realW = completedCrop && imgRef.current
-    ? Math.round(completedCrop.width * (imgRef.current.naturalWidth / imgRef.current.width))
+  const displaySize = getDisplaySize();
+  const naturalSize = getNaturalSize();
+  const realW = completedCrop && displaySize && naturalSize
+    ? Math.round(completedCrop.width * (naturalSize.w / displaySize.w))
     : 0;
-  const realH = completedCrop && imgRef.current
-    ? Math.round(completedCrop.height * (imgRef.current.naturalHeight / imgRef.current.height))
+  const realH = completedCrop && displaySize && naturalSize
+    ? Math.round(completedCrop.height * (naturalSize.h / displaySize.h))
     : 0;
 
   const handleDimensionChange = useCallback((axis: 'w' | 'h', value: number) => {
-    if (!imgRef.current || !completedCrop) return;
-    const img = imgRef.current;
-    const scaleX = img.naturalWidth / img.width;
-    const scaleY = img.naturalHeight / img.height;
+    const display = getDisplaySize();
+    const natural = getNaturalSize();
+    if (!display || !natural || !completedCrop) return;
+
+    const scaleX = natural.w / display.w;
+    const scaleY = natural.h / display.h;
 
     let newW = axis === 'w' ? value / scaleX : completedCrop.width;
     let newH = axis === 'h' ? value / scaleY : completedCrop.height;
@@ -91,35 +189,32 @@ export function CropNode(props: NodeProps) {
       }
     }
 
-    // Clamp to image bounds
-    newW = Math.min(newW, img.width);
-    newH = Math.min(newH, img.height);
+    newW = Math.min(newW, display.w);
+    newH = Math.min(newH, display.h);
 
-    // Center the crop
     const newCrop: PixelCrop = {
-      x: Math.max(0, (img.width - newW) / 2),
-      y: Math.max(0, (img.height - newH) / 2),
+      x: Math.max(0, (display.w - newW) / 2),
+      y: Math.max(0, (display.h - newH) / 2),
       width: newW,
       height: newH,
       unit: 'px',
     };
     setCrop(newCrop);
     setCompletedCrop(newCrop);
-  }, [completedCrop, lockedRatio]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [completedCrop, lockedRatio, isVideo, videoSize]);
 
   // Recalculate crop when aspect ratio changes
   useEffect(() => {
-    if (!imgRef.current) return;
-    const { width, height } = imgRef.current;
-    if (!width || !height) return;
+    const display = getDisplaySize();
+    if (!display || !display.w || !display.h) return;
+    const { w: width, h: height } = display;
 
     if (!aspectRatio) {
-      // Free: select full image
       const full: PixelCrop = { x: 0, y: 0, width, height, unit: 'px' };
       setCrop(full);
       setCompletedCrop(full);
     } else {
-      // Fit largest centered crop with given aspect ratio
       let cropW = width;
       let cropH = width / aspectRatio;
       if (cropH > height) {
@@ -136,46 +231,80 @@ export function CropNode(props: NodeProps) {
       setCrop(newCrop);
       setCompletedCrop(newCrop);
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [aspectRatio]);
 
-  // Auto-crop: whenever completedCrop changes, produce result immediately
+  // Output result when crop changes + persist crop position to settings
   useEffect(() => {
-    if (!imgRef.current || !completedCrop) return;
+    if (!completedCrop || !inputUrl) return;
 
-    const image = imgRef.current;
-    const scaleX = image.naturalWidth / image.width;
-    const scaleY = image.naturalHeight / image.height;
+    const natural = getNaturalSize();
+    const display = getDisplaySize();
+    if (!natural || !display) return;
 
-    const canvas = document.createElement('canvas');
-    canvas.width = Math.round(completedCrop.width * scaleX);
-    canvas.height = Math.round(completedCrop.height * scaleY);
-    if (canvas.width === 0 || canvas.height === 0) return;
+    const scaleX = natural.w / display.w;
+    const scaleY = natural.h / display.h;
 
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
+    const cropX = Math.round(completedCrop.x * scaleX);
+    const cropY = Math.round(completedCrop.y * scaleY);
+    const cropW = Math.round(completedCrop.width * scaleX);
+    const cropH = Math.round(completedCrop.height * scaleY);
+    if (cropW === 0 || cropH === 0) return;
 
-    ctx.drawImage(
-      image,
-      Math.round(completedCrop.x * scaleX),
-      Math.round(completedCrop.y * scaleY),
-      canvas.width,
-      canvas.height,
-      0,
-      0,
-      canvas.width,
-      canvas.height
-    );
+    // Save crop as percentages so it survives reload
+    const cropSettings = {
+      cropXPct: completedCrop.x / display.w,
+      cropYPct: completedCrop.y / display.h,
+      cropWPct: completedCrop.width / display.w,
+      cropHPct: completedCrop.height / display.h,
+    };
 
-    canvas.toBlob((blob) => {
-      if (!blob) return;
-      const url = URL.createObjectURL(blob);
+    if (isVideo) {
+      // For video: pass original URL + crop coords for canvas-based crop in Preview
       useFlowStore.getState().updateNodeData(id, {
+        settings: { ...data.settings, ...cropSettings },
         status: 'done',
-        results: [{ file: { content: url, format: 'image' } }],
+        results: [{
+          file: {
+            content: inputUrl,
+            format: 'video',
+            cropX,
+            cropY,
+            cropW,
+            cropH,
+            naturalW: natural.w,
+            naturalH: natural.h,
+          },
+        }],
         selectedResultIndex: 0,
       });
-    }, 'image/png');
-  }, [id, completedCrop]);
+    } else {
+      // For image: canvas crop
+      if (!imgRef.current) return;
+      const canvas = document.createElement('canvas');
+      canvas.width = cropW;
+      canvas.height = cropH;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) return;
+      ctx.drawImage(imgRef.current, cropX, cropY, cropW, cropH, 0, 0, cropW, cropH);
+      canvas.toBlob((blob) => {
+        if (!blob) return;
+        if (prevBlobUrlRef.current) URL.revokeObjectURL(prevBlobUrlRef.current);
+        const url = URL.createObjectURL(blob);
+        prevBlobUrlRef.current = url;
+        useFlowStore.getState().updateNodeData(id, {
+          settings: { ...data.settings, ...cropSettings },
+          status: 'done',
+          results: [{ file: { content: url, format: 'image' } }],
+          selectedResultIndex: 0,
+        });
+      }, 'image/png');
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [id, completedCrop, inputUrl, isVideo]);
+
+  const hasInput = !!inputUrl;
+  const showSettings = isVideo ? !!videoSize : !!inputUrl;
 
   return (
     <div
@@ -271,40 +400,71 @@ export function CropNode(props: NodeProps) {
         )}
 
         {/* Content area */}
-        <div className="self-stretch">
-          {inputImageUrl ? (
-            <div
-              className="overflow-hidden rounded-2xl"
-              onMouseDown={(e) => e.stopPropagation()}
-              onPointerDown={(e) => e.stopPropagation()}
-              style={{ zoom: 1 / getZoom() }}
-            >
-              <ReactCrop
-                crop={crop}
-                onChange={(c) => setCrop(c)}
-                onComplete={(c) => setCompletedCrop(c)}
-                aspect={aspectRatio}
-                className="nodrag nopan nowheel !block"
+        <div className="self-stretch relative">
+          {hasInput ? (
+            <>
+              <div
+                className="overflow-hidden rounded-2xl relative"
+                onMouseDown={(e) => e.stopPropagation()}
+                onPointerDown={(e) => e.stopPropagation()}
+                style={{ zoom: 1 / getZoom() }}
               >
-                <img
-                  ref={imgRef}
-                  src={inputImageUrl}
-                  alt="Crop source"
-                  className="block w-full"
-                  crossOrigin="anonymous"
-                  onLoad={onImageLoad}
-                />
-              </ReactCrop>
-            </div>
+                {isVideo ? (
+                  <>
+                    {/* Hidden video, canvas draws frames, ReactCrop overlays */}
+                    <video
+                      ref={videoRef}
+                      src={inputUrl!}
+                      className="hidden"
+                      muted
+                      loop
+                      playsInline
+                      autoPlay
+                      onLoadedMetadata={onVideoLoaded}
+                    />
+                    <ReactCrop
+                      crop={crop}
+                      onChange={(c) => setCrop(c)}
+                      onComplete={(c) => setCompletedCrop(c)}
+                      aspect={aspectRatio}
+                      className="nodrag nopan nowheel !block"
+                    >
+                      <canvas
+                        ref={canvasRef}
+                        className="block w-full"
+                        style={videoSize ? { aspectRatio: `${videoSize.w}/${videoSize.h}` } : undefined}
+                      />
+                    </ReactCrop>
+                  </>
+                ) : (
+                  <ReactCrop
+                    crop={crop}
+                    onChange={(c) => setCrop(c)}
+                    onComplete={(c) => setCompletedCrop(c)}
+                    aspect={aspectRatio}
+                    className="nodrag nopan nowheel !block"
+                  >
+                    <img
+                      ref={imgRef}
+                      src={inputUrl!}
+                      alt="Crop source"
+                      className="block w-full"
+                      crossOrigin="anonymous"
+                      onLoad={onImageLoad}
+                    />
+                  </ReactCrop>
+                )}
+              </div>
+            </>
           ) : (
             <div className="bg-[#212121] rounded-2xl checkerboard flex items-center justify-center aspect-square">
-              <span className="text-zinc-500 text-sm">Connect an image input</span>
+              <span className="text-zinc-500 text-sm">Connect a file input</span>
             </div>
           )}
         </div>
 
         {/* Settings */}
-        {inputImageUrl && (
+        {showSettings && (
           <div className="mt-3 space-y-2 self-stretch">
             <div className="flex items-center gap-3">
               <span className="text-[11px] text-zinc-500 w-[70px]">Aspect Ratio</span>
@@ -320,7 +480,7 @@ export function CropNode(props: NodeProps) {
                 ))}
               </select>
             </div>
-            {completedCrop && imgRef.current && (
+            {completedCrop && (
               <div className="flex items-center gap-3">
                 <span className="text-[11px] text-zinc-500 w-[70px]">Dimensions</span>
                 <div className="flex items-center gap-2 flex-1">
@@ -330,7 +490,7 @@ export function CropNode(props: NodeProps) {
                     className="text-xs text-zinc-300 bg-[#212121] rounded-lg px-2 py-1.5 border border-[#333] flex-1 text-center w-16 focus:outline-none focus:border-zinc-500 nodrag [&::-webkit-inner-spin-button]:appearance-none"
                     value={realW}
                     min={1}
-                    max={imgRef.current.naturalWidth}
+                    max={naturalSize?.w || 9999}
                     onChange={(e) => handleDimensionChange('w', Number(e.target.value))}
                   />
                   <span className="text-[11px] text-zinc-500">H</span>
@@ -339,7 +499,7 @@ export function CropNode(props: NodeProps) {
                     className="text-xs text-zinc-300 bg-[#212121] rounded-lg px-2 py-1.5 border border-[#333] flex-1 text-center w-16 focus:outline-none focus:border-zinc-500 nodrag [&::-webkit-inner-spin-button]:appearance-none"
                     value={realH}
                     min={1}
-                    max={imgRef.current.naturalHeight}
+                    max={naturalSize?.h || 9999}
                     onChange={(e) => handleDimensionChange('h', Number(e.target.value))}
                   />
                   <button

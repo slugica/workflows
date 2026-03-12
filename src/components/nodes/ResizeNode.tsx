@@ -3,7 +3,7 @@
 import { useRef, useMemo, useState, useEffect } from 'react';
 import { Handle, Position, useEdges, useNodes, type NodeProps } from '@xyflow/react';
 import { FlowNodeData, HANDLE_COLORS } from '@/lib/types';
-import { resolveInputImageUrl } from '@/lib/resolveInput';
+import { resolveInput } from '@/lib/resolveInput';
 import { useFlowStore } from '@/store/flowStore';
 import { Scaling, Link, Unlink } from 'lucide-react';
 
@@ -14,6 +14,8 @@ export function ResizeNode(props: NodeProps) {
   const allNodes = useNodes();
   const edges = useEdges();
   const imgRef = useRef<HTMLImageElement>(null);
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const prevBlobUrlRef = useRef<string | null>(null);
 
   const connectedHandles = useMemo(() => {
     const set = new Set<string>();
@@ -24,14 +26,19 @@ export function ResizeNode(props: NodeProps) {
     return set;
   }, [edges, id]);
 
-  const inputImageUrl = resolveInputImageUrl(id, allNodes, edges);
+  const resolved = resolveInput(id, allNodes, edges);
+  const inputUrl = resolved?.url ?? null;
+  const isVideo = resolved?.mediaType === 'video';
+
+  // Cleanup blob URL on unmount
+  useEffect(() => () => { if (prevBlobUrlRef.current) URL.revokeObjectURL(prevBlobUrlRef.current); }, []);
 
   const [imgNatural, setImgNatural] = useState<{ w: number; h: number } | null>(null);
   const [targetW, setTargetW] = useState<number>(0);
   const [targetH, setTargetH] = useState<number>(0);
   const [locked, setLocked] = useState(true);
 
-  // When a new image loads, init target dimensions to natural size
+  // When a new image/video loads, init target dimensions to natural size
   useEffect(() => {
     if (!imgNatural) return;
     setTargetW(imgNatural.w);
@@ -67,10 +74,21 @@ export function ResizeNode(props: NodeProps) {
     }
   };
 
-  // Apply resize on committed dimensions
+  // Video path: pass through URL immediately
   useEffect(() => {
-    if (!imgRef.current || !imgNatural || targetW === 0 || targetH === 0) return;
+    if (!inputUrl || !isVideo) return;
+    useFlowStore.getState().updateNodeData(id, {
+      status: 'done',
+      results: [{ file: { content: inputUrl, format: 'video' } }],
+      selectedResultIndex: 0,
+    });
+  }, [id, inputUrl, isVideo]);
 
+  // Image path: existing canvas resize logic
+  useEffect(() => {
+    if (!inputUrl || isVideo) return;
+    if (!imgNatural || targetW === 0 || targetH === 0) return;
+    if (!imgRef.current) return;
     const image = imgRef.current;
     if (image.naturalWidth === 0) return;
 
@@ -84,17 +102,22 @@ export function ResizeNode(props: NodeProps) {
 
     canvas.toBlob((blob) => {
       if (!blob) return;
+      if (prevBlobUrlRef.current) URL.revokeObjectURL(prevBlobUrlRef.current);
       const url = URL.createObjectURL(blob);
+      prevBlobUrlRef.current = url;
       useFlowStore.getState().updateNodeData(id, {
         status: 'done',
         results: [{ file: { content: url, format: 'image' } }],
         selectedResultIndex: 0,
       });
     }, 'image/png');
-  }, [id, inputImageUrl, targetW, targetH, imgNatural]);
+  }, [id, inputUrl, isVideo, targetW, targetH, imgNatural]);
 
   const resultUrl = data.results?.[0]
     ? Object.values(data.results[0])[0]?.content
+    : null;
+  const resultFormat = data.results?.[0]
+    ? Object.values(data.results[0])[0]?.format
     : null;
 
   return (
@@ -193,28 +216,54 @@ export function ResizeNode(props: NodeProps) {
 
         {/* Content */}
         <div className="self-stretch">
-          {inputImageUrl ? (
+          {inputUrl ? (
             <div className="flex flex-col gap-0">
-              {/* Hidden source image */}
-              <img
-                ref={imgRef}
-                src={inputImageUrl}
-                alt=""
-                className="hidden"
-                crossOrigin="anonymous"
-                onLoad={(e) => setImgNatural({ w: e.currentTarget.naturalWidth, h: e.currentTarget.naturalHeight })}
-              />
+              {/* Hidden source image (for image input) */}
+              {!isVideo && (
+                <img
+                  ref={imgRef}
+                  src={inputUrl}
+                  alt=""
+                  className="hidden"
+                  crossOrigin="anonymous"
+                  onLoad={(e) => setImgNatural({ w: e.currentTarget.naturalWidth, h: e.currentTarget.naturalHeight })}
+                />
+              )}
+
+              {/* Hidden source video (for video input) */}
+              {isVideo && (
+                <video
+                  ref={videoRef}
+                  src={inputUrl}
+                  className="hidden"
+                  crossOrigin="anonymous"
+                  onLoadedMetadata={(e) => {
+                    const v = e.currentTarget;
+                    setImgNatural({ w: v.videoWidth, h: v.videoHeight });
+                  }}
+                />
+              )}
 
               {/* Preview */}
               <div
-                className="bg-[#212121] rounded-2xl overflow-hidden"
+                className="relative bg-[#212121] rounded-2xl overflow-hidden"
                 style={contentSize ? { width: contentSize.w, height: contentSize.h } : undefined}
               >
-                <img
-                  src={resultUrl || inputImageUrl}
-                  alt="Resize result"
-                  className="w-full h-full object-cover"
-                />
+                {resultFormat === 'video' || isVideo ? (
+                  <video
+                    controls
+                    muted
+                    loop
+                    src={resultUrl || inputUrl}
+                    className="w-full h-full object-cover nodrag"
+                  />
+                ) : (
+                  <img
+                    src={resultUrl || inputUrl}
+                    alt="Resize result"
+                    className="w-full h-full object-cover"
+                  />
+                )}
               </div>
 
               {/* Controls */}
@@ -249,7 +298,7 @@ export function ResizeNode(props: NodeProps) {
             </div>
           ) : (
             <div className="h-[320px] bg-[#212121] rounded-2xl checkerboard flex items-center justify-center">
-              <span className="text-zinc-500 text-sm">Connect an image input</span>
+              <span className="text-zinc-500 text-sm">Connect a file input</span>
             </div>
           )}
         </div>

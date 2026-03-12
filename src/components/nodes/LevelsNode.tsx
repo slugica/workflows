@@ -4,7 +4,7 @@ import { useRef, useMemo, useState, useEffect, useCallback } from 'react';
 import { Handle, Position, useEdges, useNodes, type NodeProps } from '@xyflow/react';
 import * as Slider from '@radix-ui/react-slider';
 import { FlowNodeData, HANDLE_COLORS } from '@/lib/types';
-import { resolveInputImageUrl } from '@/lib/resolveInput';
+import { resolveInput } from '@/lib/resolveInput';
 import { useFlowStore } from '@/store/flowStore';
 import { SlidersHorizontal, RotateCcw } from 'lucide-react';
 
@@ -117,6 +117,14 @@ const rangeClass = 'absolute h-full bg-zinc-500 rounded-full';
 const valToPercent = (v: number) => (v / 255) * 100;
 const percentToVal = (pct: number) => Math.round(Math.max(0, Math.min(255, (pct / 100) * 255)));
 
+function isDefaultLevel(lv: LevelValues): boolean {
+  return lv.shadowIn === 0 && lv.highlightIn === 255 && lv.shadowOut === 0 && lv.highlightOut === 255 && lv.gamma === 1.0;
+}
+
+function isAllDefault(levels: AllChannelLevels): boolean {
+  return isDefaultLevel(levels.rgb) && isDefaultLevel(levels.red) && isDefaultLevel(levels.green) && isDefaultLevel(levels.blue);
+}
+
 /** Custom 3-thumb slider for Input Levels — gamma thumb auto-moves with shadow/highlight */
 function InputLevelsSlider({
   shadowIn, gamma, highlightIn,
@@ -222,13 +230,16 @@ export function LevelsNode(props: NodeProps) {
     return set;
   }, [edges, id]);
 
-  const inputImageUrl = resolveInputImageUrl(id, allNodes, edges);
+  const resolved = resolveInput(id, allNodes, edges);
+  const inputUrl = resolved?.url ?? null;
+  const isVideo = resolved?.mediaType === 'video';
 
   const [channel, setChannel] = useState<Channel>('rgb');
   const [allLevels, setAllLevels] = useState<AllChannelLevels>(defaultAllChannels);
   const [committedLevels, setCommittedLevels] = useState<AllChannelLevels>(defaultAllChannels);
   const [imgNatural, setImgNatural] = useState<{ w: number; h: number } | null>(null);
   const sourceImageDataRef = useRef<ImageData | null>(null);
+  const [thumbnailUrl, setThumbnailUrl] = useState<string | null>(null);
 
   // Current channel's levels
   const levels = allLevels[channel];
@@ -248,6 +259,28 @@ export function LevelsNode(props: NodeProps) {
     if (ch > MAX_H) { ch = MAX_H; cw = ch * ratio; }
     return { w: Math.round(cw), h: Math.round(ch) };
   }, [imgNatural]);
+
+  // For video input, extract first frame using hidden video + canvas for histogram
+  useEffect(() => {
+    if (!inputUrl || !isVideo) {
+      setThumbnailUrl(null);
+      return;
+    }
+    const video = document.createElement('video');
+    video.crossOrigin = 'anonymous';
+    video.src = inputUrl;
+    video.currentTime = 0.1;
+    video.muted = true;
+    video.onloadeddata = () => {
+      const canvas = document.createElement('canvas');
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
+      canvas.getContext('2d')!.drawImage(video, 0, 0);
+      setThumbnailUrl(canvas.toDataURL('image/png'));
+      setImgNatural({ w: video.videoWidth, h: video.videoHeight });
+    };
+    return () => { video.src = ''; };
+  }, [inputUrl, isVideo]);
 
   const onImgLoad = useCallback((e: React.SyntheticEvent<HTMLImageElement>) => {
     const img = e.currentTarget;
@@ -272,9 +305,21 @@ export function LevelsNode(props: NodeProps) {
 
   const prevBlobUrlRef = useRef<string | null>(null);
 
-  // Apply all channel levels: RGB first to all, then per-channel on top
+  // Video path: pass through URL immediately
   useEffect(() => {
+    if (!inputUrl || !isVideo) return;
+    useFlowStore.getState().updateNodeData(id, {
+      status: 'done',
+      results: [{ file: { content: inputUrl, format: 'video' } }],
+      selectedResultIndex: 0,
+    });
+  }, [id, inputUrl, isVideo]);
+
+  // Image path: existing pixel manipulation logic
+  useEffect(() => {
+    if (!inputUrl || isVideo) return;
     if (!imgRef.current || !imgNatural) return;
+
     const image = imgRef.current;
     const { naturalWidth: nw, naturalHeight: nh } = image;
     if (nw === 0 || nh === 0) return;
@@ -323,10 +368,13 @@ export function LevelsNode(props: NodeProps) {
         selectedResultIndex: 0,
       });
     }, 'image/png');
-  }, [id, inputImageUrl, committedLevels, imgNatural]);
+  }, [id, inputUrl, isVideo, committedLevels, imgNatural]);
 
   const resultUrl = data.results?.[0]
     ? Object.values(data.results[0])[0]?.content
+    : null;
+  const resultFormat = data.results?.[0]
+    ? Object.values(data.results[0])[0]?.format
     : null;
 
   // Reset only current channel
@@ -336,6 +384,13 @@ export function LevelsNode(props: NodeProps) {
   };
 
   const commitLevels = () => setCommittedLevels({ ...allLevels });
+
+  // Determine the image source for the hidden <img> used for histogram
+  const histogramImgSrc = isVideo ? thumbnailUrl : inputUrl;
+
+  // CSS filter approximation for video preview
+  const rgb = committedLevels.rgb;
+  const videoCssFilter = `brightness(${rgb.gamma}) contrast(${(rgb.highlightIn - rgb.shadowIn) / 255})`;
 
   return (
     <div
@@ -425,11 +480,27 @@ export function LevelsNode(props: NodeProps) {
 
         {/* Content */}
         <div className="self-stretch">
-          {inputImageUrl ? (
+          {inputUrl ? (
             <>
-              <img ref={imgRef} src={inputImageUrl} alt="" className="hidden" crossOrigin="anonymous" onLoad={onImgLoad} />
-              <div className="bg-[#212121] rounded-2xl overflow-hidden" style={contentSize ? { width: contentSize.w, height: contentSize.h } : undefined}>
-                <img src={resultUrl || inputImageUrl} alt="Levels result" className="w-full h-full object-cover" />
+              {/* Hidden image for histogram computation */}
+              {histogramImgSrc && (
+                <img ref={imgRef} src={histogramImgSrc} alt="" className="hidden" crossOrigin="anonymous" onLoad={onImgLoad} />
+              )}
+
+              {/* Preview area */}
+              <div className="relative bg-[#212121] rounded-2xl overflow-hidden" style={contentSize ? { width: contentSize.w, height: contentSize.h } : undefined}>
+                {isVideo ? (
+                  <video
+                    src={inputUrl}
+                    className="w-full h-full object-cover nodrag"
+                    controls
+                    muted
+                    loop
+                    style={{ filter: videoCssFilter }}
+                  />
+                ) : (
+                  <img src={resultUrl || inputUrl} alt="Levels result" className="w-full h-full object-cover" />
+                )}
               </div>
             </>
           ) : (

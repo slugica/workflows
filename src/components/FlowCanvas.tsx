@@ -70,6 +70,11 @@ const nodeTypes: NodeTypes = {
   relight: RelightNode,
   cameraAngles: CameraAnglesNode,
   section: SectionNode,
+  extractFrame: BaseNode,
+  trimVideo: BaseNode,
+  combineAudioVideo: BaseNode,
+  combineVideo: BaseNode,
+  videoIterator: BaseNode,
 };
 
 function parseHandleInfo(handleId: string): { direction: string; type: string; key: string } | null {
@@ -497,7 +502,10 @@ export function FlowCanvas() {
     const sourceInfo = parseHandleInfo(sourceHandle);
     const targetInfo = parseHandleInfo(targetHandle);
     if (!sourceInfo || !targetInfo) return false;
-    if (sourceInfo.type !== targetInfo.type) return false;
+    const fileTypes = new Set(['file', 'image', 'video']);
+    const typesMatch = sourceInfo.type === targetInfo.type
+      || (fileTypes.has(sourceInfo.type) && fileTypes.has(targetInfo.type));
+    if (!typesMatch) return false;
     if (connection.source === connection.target) return false;
     return true;
   }, []);

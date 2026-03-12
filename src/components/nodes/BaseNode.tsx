@@ -248,7 +248,8 @@ export function BaseNode(props: NodeProps) {
                 ) : (data.settings.fileType as string)?.startsWith('video/') ? (
                   <video
                     src={data.settings.fileUrl as string}
-                    className="w-full h-full object-cover"
+                    className="w-full h-full object-cover nodrag"
+                    controls
                     muted
                   />
                 ) : (

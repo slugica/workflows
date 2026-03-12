@@ -1,4 +1,4 @@
-export type HandleDataType = 'image' | 'text' | 'video' | 'audio';
+export type HandleDataType = 'image' | 'text' | 'video' | 'audio' | 'file';
 
 export interface HandleDef {
   id: string;
@@ -36,7 +36,7 @@ export interface FlowNodeData {
   errorMessage?: string;
 }
 
-export type FlowNodeType = 'import' | 'prompt' | 'image' | 'video' | 'audio' | 'crop' | 'export' | 'preview' | 'blur' | 'resize' | 'filters' | 'levels' | 'splitImage' | 'imageIterator' | 'aiResize' | 'relight' | 'cameraAngles' | 'section';
+export type FlowNodeType = 'import' | 'prompt' | 'image' | 'video' | 'audio' | 'crop' | 'export' | 'preview' | 'blur' | 'resize' | 'filters' | 'levels' | 'splitImage' | 'imageIterator' | 'aiResize' | 'relight' | 'cameraAngles' | 'section' | 'extractFrame' | 'trimVideo' | 'combineAudioVideo' | 'combineVideo' | 'videoIterator';
 
 export interface NodeTemplate {
   type: FlowNodeType;
@@ -50,6 +50,7 @@ export const HANDLE_COLORS: Record<HandleDataType, string> = {
   text: '#3CB8FF',
   video: '#4ADE80',
   audio: '#F472B6',
+  file: '#FCB84A',
 };
 
 import { MODEL_REGISTRY, getDefaultSettings } from './modelRegistry';
@@ -64,7 +65,7 @@ const STATIC_TEMPLATES: NodeTemplate[] = [
       behavior: 'static',
       handles: {
         inputs: [],
-        outputs: [{ id: '', key: 'file', label: 'File', type: 'image' }],
+        outputs: [{ id: '', key: 'file', label: 'File', type: 'file' }],
       },
       settings: { allowedFileTypes: ['image/jpeg', 'image/png', 'image/webp'] },
     },
@@ -77,7 +78,7 @@ const STATIC_TEMPLATES: NodeTemplate[] = [
       behavior: 'static',
       handles: {
         inputs: [],
-        outputs: [{ id: '', key: 'file', label: 'Image', type: 'image' }],
+        outputs: [{ id: '', key: 'file', label: 'File', type: 'file' }],
       },
       settings: { allowedFileTypes: ['image/jpeg', 'image/png', 'image/webp', 'image/gif'] },
     },
@@ -90,7 +91,7 @@ const STATIC_TEMPLATES: NodeTemplate[] = [
       behavior: 'static',
       handles: {
         inputs: [],
-        outputs: [{ id: '', key: 'file', label: 'Video', type: 'video' }],
+        outputs: [{ id: '', key: 'file', label: 'File', type: 'file' }],
       },
       settings: { allowedFileTypes: ['video/mp4', 'video/webm', 'video/mov'] },
     },
@@ -115,8 +116,8 @@ const STATIC_TEMPLATES: NodeTemplate[] = [
     defaultData: {
       behavior: 'static',
       handles: {
-        inputs: [{ id: '', key: 'file', label: 'File', type: 'image', required: false }],
-        outputs: [{ id: '', key: 'file', label: 'File', type: 'image' }],
+        inputs: [{ id: '', key: 'file', label: 'File', type: 'file', required: false }],
+        outputs: [{ id: '', key: 'file', label: 'File', type: 'file' }],
       },
       settings: {},
     },
@@ -128,7 +129,7 @@ const STATIC_TEMPLATES: NodeTemplate[] = [
     defaultData: {
       behavior: 'static',
       handles: {
-        inputs: [{ id: '', key: 'file', label: 'Input', type: 'image', required: true }],
+        inputs: [{ id: '', key: 'file', label: 'Input', type: 'file', required: true }],
         outputs: [],
       },
       settings: { fileType: 'png', scale: 1 },
@@ -137,25 +138,12 @@ const STATIC_TEMPLATES: NodeTemplate[] = [
   {
     type: 'crop',
     label: 'Crop',
-    category: 'Utility',
+    category: 'Shared Utility',
     defaultData: {
       behavior: 'static',
       handles: {
-        inputs: [{ id: '', key: 'file', label: 'File', type: 'image', required: true }],
-        outputs: [{ id: '', key: 'file', label: 'Image', type: 'image' }],
-      },
-      settings: {},
-    },
-  },
-  {
-    type: 'blur',
-    label: 'Blur',
-    category: 'Utility',
-    defaultData: {
-      behavior: 'static',
-      handles: {
-        inputs: [{ id: '', key: 'file', label: 'File', type: 'image', required: true }],
-        outputs: [{ id: '', key: 'file', label: 'File', type: 'image' }],
+        inputs: [{ id: '', key: 'file', label: 'File', type: 'file', required: true }],
+        outputs: [{ id: '', key: 'file', label: 'File', type: 'file' }],
       },
       settings: {},
     },
@@ -163,25 +151,25 @@ const STATIC_TEMPLATES: NodeTemplate[] = [
   {
     type: 'resize',
     label: 'Resize',
-    category: 'Utility',
+    category: 'Shared Utility',
     defaultData: {
       behavior: 'static',
       handles: {
-        inputs: [{ id: '', key: 'file', label: 'File', type: 'image', required: true }],
-        outputs: [{ id: '', key: 'file', label: 'File', type: 'image' }],
+        inputs: [{ id: '', key: 'file', label: 'File', type: 'file', required: true }],
+        outputs: [{ id: '', key: 'file', label: 'File', type: 'file' }],
       },
       settings: {},
     },
   },
   {
-    type: 'filters',
-    label: 'Filters',
-    category: 'Utility',
+    type: 'blur',
+    label: 'Blur',
+    category: 'Shared Utility',
     defaultData: {
       behavior: 'static',
       handles: {
-        inputs: [{ id: '', key: 'file', label: 'File', type: 'image', required: true }],
-        outputs: [{ id: '', key: 'file', label: 'File', type: 'image' }],
+        inputs: [{ id: '', key: 'file', label: 'File', type: 'file', required: true }],
+        outputs: [{ id: '', key: 'file', label: 'File', type: 'file' }],
       },
       settings: {},
     },
@@ -189,12 +177,25 @@ const STATIC_TEMPLATES: NodeTemplate[] = [
   {
     type: 'levels',
     label: 'Levels',
-    category: 'Utility',
+    category: 'Shared Utility',
     defaultData: {
       behavior: 'static',
       handles: {
-        inputs: [{ id: '', key: 'file', label: 'File', type: 'image', required: true }],
-        outputs: [{ id: '', key: 'file', label: 'File', type: 'image' }],
+        inputs: [{ id: '', key: 'file', label: 'File', type: 'file', required: true }],
+        outputs: [{ id: '', key: 'file', label: 'File', type: 'file' }],
+      },
+      settings: {},
+    },
+  },
+  {
+    type: 'filters',
+    label: 'Filters',
+    category: 'Shared Utility',
+    defaultData: {
+      behavior: 'static',
+      handles: {
+        inputs: [{ id: '', key: 'file', label: 'File', type: 'file', required: true }],
+        outputs: [{ id: '', key: 'file', label: 'File', type: 'file' }],
       },
       settings: {},
     },
@@ -202,7 +203,7 @@ const STATIC_TEMPLATES: NodeTemplate[] = [
   {
     type: 'aiResize',
     label: 'AI Resize',
-    category: 'Utility',
+    category: 'Image Utility',
     defaultData: {
       behavior: 'static',
       handles: {
@@ -215,7 +216,7 @@ const STATIC_TEMPLATES: NodeTemplate[] = [
   {
     type: 'relight',
     label: 'Relight',
-    category: 'Utility',
+    category: 'Image Utility',
     defaultData: {
       behavior: 'static',
       handles: {
@@ -228,7 +229,7 @@ const STATIC_TEMPLATES: NodeTemplate[] = [
   {
     type: 'cameraAngles',
     label: 'Multiple Camera Angles',
-    category: 'Utility',
+    category: 'Image Utility',
     defaultData: {
       behavior: 'static',
       handles: {
@@ -253,7 +254,7 @@ const STATIC_TEMPLATES: NodeTemplate[] = [
   {
     type: 'imageIterator',
     label: 'Image Iterator',
-    category: 'Utility',
+    category: 'Image Utility',
     defaultData: {
       behavior: 'static',
       handles: {
@@ -266,12 +267,81 @@ const STATIC_TEMPLATES: NodeTemplate[] = [
   {
     type: 'splitImage',
     label: 'Split Image',
-    category: 'Utility',
+    category: 'Image Utility',
     defaultData: {
       behavior: 'static',
       handles: {
         inputs: [{ id: '', key: 'file', label: 'Input', type: 'image', required: true }],
         outputs: [],
+      },
+      settings: {},
+    },
+  },
+  // ── Video Utility ─────────────────────────────────────────────────────────
+  {
+    type: 'extractFrame',
+    label: 'Extract Video Frame',
+    category: 'Video Utility',
+    defaultData: {
+      behavior: 'static',
+      handles: {
+        inputs: [{ id: '', key: 'file', label: 'Video', type: 'video', required: true }],
+        outputs: [{ id: '', key: 'frame', label: 'Frame', type: 'image' }],
+      },
+      settings: { timestamp: 0 },
+    },
+  },
+  {
+    type: 'trimVideo',
+    label: 'Trim Video',
+    category: 'Video Utility',
+    defaultData: {
+      behavior: 'static',
+      handles: {
+        inputs: [{ id: '', key: 'file', label: 'Video', type: 'video', required: true }],
+        outputs: [{ id: '', key: 'file', label: 'Video', type: 'video' }],
+      },
+      settings: { startTime: 0, endTime: 10 },
+    },
+  },
+  {
+    type: 'combineAudioVideo',
+    label: 'Combine Audio Video',
+    category: 'Video Utility',
+    defaultData: {
+      behavior: 'static',
+      handles: {
+        inputs: [
+          { id: '', key: 'video', label: 'Video', type: 'video', required: true },
+          { id: '', key: 'audio', label: 'Audio', type: 'audio', required: true },
+        ],
+        outputs: [{ id: '', key: 'file', label: 'Video', type: 'video' }],
+      },
+      settings: {},
+    },
+  },
+  {
+    type: 'combineVideo',
+    label: 'Combine Video',
+    category: 'Video Utility',
+    defaultData: {
+      behavior: 'static',
+      handles: {
+        inputs: [{ id: '', key: 'video_1', label: 'Video', type: 'video', required: false, dynamic: true, maxDynamic: 10, dynamicBase: 'video' }],
+        outputs: [{ id: '', key: 'file', label: 'Video', type: 'video' }],
+      },
+      settings: {},
+    },
+  },
+  {
+    type: 'videoIterator',
+    label: 'Video Iterator',
+    category: 'Video Utility',
+    defaultData: {
+      behavior: 'static',
+      handles: {
+        inputs: [{ id: '', key: 'video_1', label: 'Input', type: 'video', required: false, dynamic: true, maxDynamic: 20, dynamicBase: 'video' }],
+        outputs: [{ id: '', key: 'output', label: 'Output', type: 'video' }],
       },
       settings: {},
     },

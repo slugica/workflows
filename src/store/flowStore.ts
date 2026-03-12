@@ -126,7 +126,10 @@ export const useFlowStore = create<FlowState>((set, get) => ({
 
     const sourceType = parseHandleType(sourceHandle);
     const targetType = parseHandleType(targetHandle);
-    if (!sourceType || !targetType || sourceType !== targetType) return;
+    if (!sourceType || !targetType) return;
+    const fileTypes = new Set(['file', 'image', 'video']);
+    const typesMatch = sourceType === targetType || (fileTypes.has(sourceType) && fileTypes.has(targetType));
+    if (!typesMatch) return;
 
     get().pushUndo();
 
