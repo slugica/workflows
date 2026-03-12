@@ -34,6 +34,7 @@ import { AiResizeNode } from '@/components/nodes/AiResizeNode';
 import { RelightNode } from '@/components/nodes/RelightNode';
 import { CameraAnglesNode } from '@/components/nodes/CameraAnglesNode';
 import { SectionNode } from '@/components/nodes/SectionNode';
+import { TrimVideoNode } from '@/components/nodes/TrimVideoNode';
 import { FlowNodeType, HANDLE_COLORS, type FlowNodeData } from '@/lib/types';
 
 function CustomConnectionLine({ fromX, fromY, toX, toY, fromPosition, toPosition, fromNode, fromHandle }: ConnectionLineComponentProps) {
@@ -71,7 +72,7 @@ const nodeTypes: NodeTypes = {
   cameraAngles: CameraAnglesNode,
   section: SectionNode,
   extractFrame: BaseNode,
-  trimVideo: BaseNode,
+  trimVideo: TrimVideoNode,
   combineAudioVideo: BaseNode,
   combineVideo: BaseNode,
   videoIterator: BaseNode,

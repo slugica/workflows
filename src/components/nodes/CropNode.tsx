@@ -2,7 +2,7 @@
 
 import { useRef, useCallback, useMemo, useState, useEffect } from 'react';
 import { Handle, Position, useEdges, useNodes, useReactFlow, type NodeProps } from '@xyflow/react';
-import ReactCrop, { type Crop, type PixelCrop } from 'react-image-crop';
+import ReactCrop, { type Crop } from 'react-image-crop';
 import 'react-image-crop/dist/ReactCrop.css';
 import { FlowNodeData, HANDLE_COLORS } from '@/lib/types';
 import { resolveInput } from '@/lib/resolveInput';
@@ -45,7 +45,7 @@ export function CropNode(props: NodeProps) {
   const isVideo = resolved?.mediaType === 'video';
 
   const [crop, setCrop] = useState<Crop>();
-  const [completedCrop, setCompletedCrop] = useState<PixelCrop | null>(null);
+  const [completedCrop, setCompletedCrop] = useState<Crop | null>(null);
   const [aspectRatioIdx, setAspectRatioIdx] = useState(0);
   const [lockedRatio, setLockedRatio] = useState<number | null>(null);
   const [videoSize, setVideoSize] = useState<{ w: number; h: number } | null>(null);
@@ -84,16 +84,17 @@ export function CropNode(props: NodeProps) {
   }, [isVideo, inputUrl, drawVideoFrame]);
 
   // Restore saved crop from settings, or use default 15% inset
-  const restoreCropForDisplay = useCallback((displayW: number, displayH: number, naturalW: number, naturalH: number) => {
+  // Uses percentage units so crop is zoom-independent
+  const restoreCropForDisplay = useCallback(() => {
     const saved = data.settings as Record<string, unknown>;
     if (saved.cropXPct != null && !restoredRef.current) {
       restoredRef.current = true;
-      const restored: PixelCrop = {
-        x: (saved.cropXPct as number) * displayW,
-        y: (saved.cropYPct as number) * displayH,
-        width: (saved.cropWPct as number) * displayW,
-        height: (saved.cropHPct as number) * displayH,
-        unit: 'px',
+      const restored: Crop = {
+        x: (saved.cropXPct as number) * 100,
+        y: (saved.cropYPct as number) * 100,
+        width: (saved.cropWPct as number) * 100,
+        height: (saved.cropHPct as number) * 100,
+        unit: '%',
       };
       setCrop(restored);
       setCompletedCrop(restored);
@@ -101,22 +102,21 @@ export function CropNode(props: NodeProps) {
     }
     if (restoredRef.current) return;
     restoredRef.current = true;
-    const pad = 0.15;
-    const initialCrop: PixelCrop = {
-      x: Math.round(displayW * pad),
-      y: Math.round(displayH * pad),
-      width: Math.round(displayW * (1 - pad * 2)),
-      height: Math.round(displayH * (1 - pad * 2)),
-      unit: 'px',
+    const pad = 15;
+    const initialCrop: Crop = {
+      x: pad,
+      y: pad,
+      width: 100 - pad * 2,
+      height: 100 - pad * 2,
+      unit: '%',
     };
     setCrop(initialCrop);
     setCompletedCrop(initialCrop);
   }, [data.settings]);
 
   // Set initial crop when image loads (for image mode)
-  const onImageLoad = useCallback((e: React.SyntheticEvent<HTMLImageElement>) => {
-    const { width, height, naturalWidth, naturalHeight } = e.currentTarget;
-    restoreCropForDisplay(width, height, naturalWidth, naturalHeight);
+  const onImageLoad = useCallback(() => {
+    restoreCropForDisplay();
   }, [restoreCropForDisplay]);
 
   // Set initial crop when video metadata loads
@@ -129,75 +129,54 @@ export function CropNode(props: NodeProps) {
 
   // When videoSize is set, restore or calculate initial crop
   useEffect(() => {
-    if (!videoSize || !canvasRef.current) return;
-    const canvas = canvasRef.current;
-    requestAnimationFrame(() => {
-      const { width, height } = canvas.getBoundingClientRect();
-      if (!width || !height) return;
-      restoreCropForDisplay(width, height, videoSize.w, videoSize.h);
-    });
+    if (!videoSize) return;
+    restoreCropForDisplay();
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [videoSize]);
 
   const presetAspect = ASPECT_RATIOS[aspectRatioIdx].value;
   const aspectRatio = presetAspect ?? (lockedRatio !== null ? lockedRatio : undefined);
 
-  // Get the reference element for dimension calculations
-  const getRefElement = () => isVideo ? canvasRef.current : imgRef.current;
   const getNaturalSize = () => {
     if (isVideo && videoSize) return { w: videoSize.w, h: videoSize.h };
     if (!isVideo && imgRef.current) return { w: imgRef.current.naturalWidth, h: imgRef.current.naturalHeight };
     return null;
   };
-  const getDisplaySize = () => {
-    const el = getRefElement();
-    if (!el) return null;
-    if (isVideo) {
-      const rect = el.getBoundingClientRect();
-      return { w: rect.width, h: rect.height };
-    }
-    return { w: (el as HTMLImageElement).width, h: (el as HTMLImageElement).height };
-  };
-
   // Real pixel dimensions of the current crop
-  const displaySize = getDisplaySize();
   const naturalSize = getNaturalSize();
-  const realW = completedCrop && displaySize && naturalSize
-    ? Math.round(completedCrop.width * (naturalSize.w / displaySize.w))
+  const realW = completedCrop && naturalSize
+    ? Math.round((completedCrop.unit === '%' ? completedCrop.width / 100 : completedCrop.width) * naturalSize.w)
     : 0;
-  const realH = completedCrop && displaySize && naturalSize
-    ? Math.round(completedCrop.height * (naturalSize.h / displaySize.h))
+  const realH = completedCrop && naturalSize
+    ? Math.round((completedCrop.unit === '%' ? completedCrop.height / 100 : completedCrop.height) * naturalSize.h)
     : 0;
 
   const handleDimensionChange = useCallback((axis: 'w' | 'h', value: number) => {
-    const display = getDisplaySize();
     const natural = getNaturalSize();
-    if (!display || !natural || !completedCrop) return;
+    if (!natural || !completedCrop) return;
 
-    const scaleX = natural.w / display.w;
-    const scaleY = natural.h / display.h;
-
-    let newW = axis === 'w' ? value / scaleX : completedCrop.width;
-    let newH = axis === 'h' ? value / scaleY : completedCrop.height;
+    // Convert input pixel value to percentage of natural size
+    let newWPct = axis === 'w' ? (value / natural.w) * 100 : (completedCrop.unit === '%' ? completedCrop.width : completedCrop.width);
+    let newHPct = axis === 'h' ? (value / natural.h) * 100 : (completedCrop.unit === '%' ? completedCrop.height : completedCrop.height);
 
     if (lockedRatio && completedCrop.width > 0 && completedCrop.height > 0) {
       const ratio = completedCrop.width / completedCrop.height;
       if (axis === 'w') {
-        newH = newW / ratio;
+        newHPct = newWPct / ratio;
       } else {
-        newW = newH * ratio;
+        newWPct = newHPct * ratio;
       }
     }
 
-    newW = Math.min(newW, display.w);
-    newH = Math.min(newH, display.h);
+    newWPct = Math.min(newWPct, 100);
+    newHPct = Math.min(newHPct, 100);
 
-    const newCrop: PixelCrop = {
-      x: Math.max(0, (display.w - newW) / 2),
-      y: Math.max(0, (display.h - newH) / 2),
-      width: newW,
-      height: newH,
-      unit: 'px',
+    const newCrop: Crop = {
+      x: Math.max(0, (100 - newWPct) / 2),
+      y: Math.max(0, (100 - newHPct) / 2),
+      width: newWPct,
+      height: newHPct,
+      unit: '%',
     };
     setCrop(newCrop);
     setCompletedCrop(newCrop);
@@ -206,27 +185,29 @@ export function CropNode(props: NodeProps) {
 
   // Recalculate crop when aspect ratio changes
   useEffect(() => {
-    const display = getDisplaySize();
-    if (!display || !display.w || !display.h) return;
-    const { w: width, h: height } = display;
+    const natural = getNaturalSize();
+    if (!natural) return;
 
     if (!aspectRatio) {
-      const full: PixelCrop = { x: 0, y: 0, width, height, unit: 'px' };
+      const full: Crop = { x: 0, y: 0, width: 100, height: 100, unit: '%' };
       setCrop(full);
       setCompletedCrop(full);
     } else {
-      let cropW = width;
-      let cropH = width / aspectRatio;
-      if (cropH > height) {
-        cropH = height;
-        cropW = height * aspectRatio;
+      // Work in percentage space, accounting for natural aspect
+      const natAspect = natural.w / natural.h;
+      // cropW% * natW and cropH% * natH should satisfy the desired aspect
+      let cropWPct = 100;
+      let cropHPct = (cropWPct * natAspect) / aspectRatio;
+      if (cropHPct > 100) {
+        cropHPct = 100;
+        cropWPct = (cropHPct * aspectRatio) / natAspect;
       }
-      const newCrop: PixelCrop = {
-        x: (width - cropW) / 2,
-        y: (height - cropH) / 2,
-        width: cropW,
-        height: cropH,
-        unit: 'px',
+      const newCrop: Crop = {
+        x: (100 - cropWPct) / 2,
+        y: (100 - cropHPct) / 2,
+        width: cropWPct,
+        height: cropHPct,
+        unit: '%',
       };
       setCrop(newCrop);
       setCompletedCrop(newCrop);
@@ -239,24 +220,26 @@ export function CropNode(props: NodeProps) {
     if (!completedCrop || !inputUrl) return;
 
     const natural = getNaturalSize();
-    const display = getDisplaySize();
-    if (!natural || !display) return;
+    if (!natural) return;
 
-    const scaleX = natural.w / display.w;
-    const scaleY = natural.h / display.h;
+    // Crop is in percentage units — convert to natural pixels
+    const pctX = completedCrop.unit === '%' ? completedCrop.x / 100 : completedCrop.x;
+    const pctY = completedCrop.unit === '%' ? completedCrop.y / 100 : completedCrop.y;
+    const pctW = completedCrop.unit === '%' ? completedCrop.width / 100 : completedCrop.width;
+    const pctH = completedCrop.unit === '%' ? completedCrop.height / 100 : completedCrop.height;
 
-    const cropX = Math.round(completedCrop.x * scaleX);
-    const cropY = Math.round(completedCrop.y * scaleY);
-    const cropW = Math.round(completedCrop.width * scaleX);
-    const cropH = Math.round(completedCrop.height * scaleY);
+    const cropX = Math.round(pctX * natural.w);
+    const cropY = Math.round(pctY * natural.h);
+    const cropW = Math.round(pctW * natural.w);
+    const cropH = Math.round(pctH * natural.h);
     if (cropW === 0 || cropH === 0) return;
 
-    // Save crop as percentages so it survives reload
+    // Save crop as fractions (0–1) so it survives reload
     const cropSettings = {
-      cropXPct: completedCrop.x / display.w,
-      cropYPct: completedCrop.y / display.h,
-      cropWPct: completedCrop.width / display.w,
-      cropHPct: completedCrop.height / display.h,
+      cropXPct: pctX,
+      cropYPct: pctY,
+      cropWPct: pctW,
+      cropHPct: pctH,
     };
 
     if (isVideo) {
@@ -424,8 +407,8 @@ export function CropNode(props: NodeProps) {
                     />
                     <ReactCrop
                       crop={crop}
-                      onChange={(c) => setCrop(c)}
-                      onComplete={(c) => setCompletedCrop(c)}
+                      onChange={(_, pct) => setCrop(pct)}
+                      onComplete={(_, pct) => setCompletedCrop(pct)}
                       aspect={aspectRatio}
                       className="nodrag nopan nowheel !block"
                     >
@@ -439,8 +422,8 @@ export function CropNode(props: NodeProps) {
                 ) : (
                   <ReactCrop
                     crop={crop}
-                    onChange={(c) => setCrop(c)}
-                    onComplete={(c) => setCompletedCrop(c)}
+                    onChange={(_, pct) => setCrop(pct)}
+                    onComplete={(_, pct) => setCompletedCrop(pct)}
                     aspect={aspectRatio}
                     className="nodrag nopan nowheel !block"
                   >

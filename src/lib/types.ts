@@ -296,12 +296,12 @@ const STATIC_TEMPLATES: NodeTemplate[] = [
     label: 'Trim Video',
     category: 'Video Utility',
     defaultData: {
-      behavior: 'static',
+      behavior: 'dynamic',
       handles: {
-        inputs: [{ id: '', key: 'file', label: 'Video', type: 'video', required: true }],
-        outputs: [{ id: '', key: 'file', label: 'Video', type: 'video' }],
+        inputs: [{ id: '', key: 'video', label: 'Video', type: 'video', required: true }],
+        outputs: [{ id: '', key: 'video', label: 'Video', type: 'video' }],
       },
-      settings: { startTime: 0, endTime: 10 },
+      settings: { startTime: 0, endTime: 0, duration: 0, previewTime: 0, segments: [] },
     },
   },
   {

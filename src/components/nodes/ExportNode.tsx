@@ -3,14 +3,19 @@
 import { useCallback, useMemo, useState } from 'react';
 import { Handle, Position, useEdges, useNodes, type NodeProps } from '@xyflow/react';
 import { FlowNodeData, HANDLE_COLORS } from '@/lib/types';
-import { resolveInputImageUrl } from '@/lib/resolveInput';
+import { resolveInput } from '@/lib/resolveInput';
 import { useFlowStore } from '@/store/flowStore';
 import { Upload, Loader } from 'lucide-react';
+import { executeExportNode } from '@/lib/executeNode';
 
-const FILE_TYPES = [
+const IMAGE_FILE_TYPES = [
   { label: 'PNG', value: 'png', mime: 'image/png' },
   { label: 'JPG', value: 'jpg', mime: 'image/jpeg' },
   { label: 'WEBP', value: 'webp', mime: 'image/webp' },
+];
+
+const VIDEO_FILE_TYPES = [
+  { label: 'MP4', value: 'mp4', mime: 'video/mp4' },
 ];
 
 const SCALES = [1, 2, 3, 4];
@@ -36,18 +41,54 @@ export function ExportNode(props: NodeProps) {
     return set;
   }, [edges, id]);
 
-  const inputImageUrl = resolveInputImageUrl(id, allNodes, edges);
+  const resolved = resolveInput(id, allNodes, edges);
+  const inputUrl = resolved?.url ?? null;
+  const isVideo = resolved?.mediaType === 'video';
 
-  // Load natural dimensions when input changes
+  // Walk upstream chain to find crop data (works for Crop→Export and Crop→Trim→Export)
+  const cropData = useMemo(() => {
+    let currentId = id;
+    for (let depth = 0; depth < 10; depth++) {
+      const inEdge = edges.find(
+        (e) => e.target === currentId && e.targetHandle &&
+          (e.targetHandle.includes('input:file') || e.targetHandle.includes('input:video'))
+      );
+      if (!inEdge) return null;
+      const sourceNode = allNodes.find((n) => n.id === inEdge.source);
+      if (!sourceNode) return null;
+      const sourceData = sourceNode.data as unknown as FlowNodeData;
+      if (sourceData.results?.length) {
+        const result = sourceData.results[sourceData.selectedResultIndex || 0];
+        const entry = result?.file;
+        if (entry?.cropW) {
+          return { cropW: entry.cropW as number, cropH: entry.cropH as number };
+        }
+      }
+      currentId = inEdge.source;
+    }
+    return null;
+  }, [edges, allNodes, id]);
+
+  const fileTypes = isVideo ? VIDEO_FILE_TYPES : IMAGE_FILE_TYPES;
+
+  // Switch fileType when media type changes
+  const effectiveFileType = isVideo ? 'mp4' : fileType;
+
+  // Load natural dimensions when input changes (image)
   const onImgLoad = useCallback((e: React.SyntheticEvent<HTMLImageElement>) => {
     setImgSize({ w: e.currentTarget.naturalWidth, h: e.currentTarget.naturalHeight });
+  }, []);
+
+  // Load video dimensions
+  const onVideoLoad = useCallback((e: React.SyntheticEvent<HTMLVideoElement>) => {
+    setImgSize({ w: e.currentTarget.videoWidth, h: e.currentTarget.videoHeight });
   }, []);
 
   const exportW = imgSize.w * scale;
   const exportH = imgSize.h * scale;
 
-  const handleExport = useCallback(async () => {
-    if (!inputImageUrl || imgSize.w === 0) return;
+  const handleExportImage = useCallback(async () => {
+    if (!inputUrl || imgSize.w === 0) return;
     setExporting(true);
 
     try {
@@ -56,7 +97,7 @@ export function ExportNode(props: NodeProps) {
       await new Promise<void>((resolve, reject) => {
         img.onload = () => resolve();
         img.onerror = () => reject(new Error('Failed to load image'));
-        img.src = inputImageUrl;
+        img.src = inputUrl;
       });
 
       const canvas = document.createElement('canvas');
@@ -67,8 +108,8 @@ export function ExportNode(props: NodeProps) {
 
       ctx.drawImage(img, 0, 0, exportW, exportH);
 
-      const ftConfig = FILE_TYPES.find((f) => f.value === fileType) || FILE_TYPES[0];
-      const quality = fileType === 'png' ? undefined : 0.95;
+      const ftConfig = IMAGE_FILE_TYPES.find((f) => f.value === effectiveFileType) || IMAGE_FILE_TYPES[0];
+      const quality = effectiveFileType === 'png' ? undefined : 0.95;
 
       const blob = await new Promise<Blob>((resolve, reject) => {
         canvas.toBlob(
@@ -81,7 +122,7 @@ export function ExportNode(props: NodeProps) {
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `${data.name}_${exportW}x${exportH}.${fileType}`;
+      a.download = `${data.name}_${exportW}x${exportH}.${effectiveFileType}`;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
@@ -91,7 +132,52 @@ export function ExportNode(props: NodeProps) {
     } finally {
       setExporting(false);
     }
-  }, [inputImageUrl, imgSize, exportW, exportH, fileType, data.name]);
+  }, [inputUrl, imgSize, exportW, exportH, effectiveFileType, data.name]);
+
+  const [exportError, setExportError] = useState<string | null>(null);
+
+  const handleExportVideo = useCallback(async () => {
+    if (!inputUrl) return;
+    setExporting(true);
+    setExportError(null);
+
+    try {
+      // Execute the full chain (crop, trim, etc.) via Rendi
+      const result = await executeExportNode(id, allNodes, edges);
+
+      if (!result.success) {
+        setExportError(result.error || 'Export failed');
+        return;
+      }
+
+      const outputUrl = result.results?.[0]?.file?.content;
+      if (!outputUrl) {
+        setExportError('No output URL returned');
+        return;
+      }
+
+      // Download the processed video
+      const res = await fetch(outputUrl);
+      if (!res.ok) throw new Error('Failed to download processed video');
+      const blob = await res.blob();
+
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${data.name}.mp4`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error('Export failed:', err);
+      setExportError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setExporting(false);
+    }
+  }, [inputUrl, data.name, id, allNodes, edges]);
+
+  const handleExport = isVideo ? handleExportVideo : handleExportImage;
 
   return (
     <div
@@ -157,58 +243,85 @@ export function ExportNode(props: NodeProps) {
 
         {/* Content */}
         <div className="self-stretch">
-          {inputImageUrl ? (
+          {inputUrl ? (
             <div className="rounded-2xl bg-[#212121]/50 p-4 space-y-3">
-              {/* Hidden image to get natural dimensions */}
-              <img
-                src={inputImageUrl}
-                alt=""
-                className="hidden"
-                crossOrigin="anonymous"
-                onLoad={onImgLoad}
-              />
+              {/* Hidden element to get natural dimensions */}
+              {isVideo ? (
+                <video
+                  src={inputUrl}
+                  className="hidden"
+                  crossOrigin="anonymous"
+                  onLoadedMetadata={onVideoLoad}
+                  preload="metadata"
+                />
+              ) : (
+                <img
+                  src={inputUrl}
+                  alt=""
+                  className="hidden"
+                  crossOrigin="anonymous"
+                  onLoad={onImgLoad}
+                />
+              )}
 
               {/* File type */}
               <div className="flex flex-col gap-1">
                 <label className="text-[11px] text-zinc-500">File type</label>
                 <select
                   className="w-full bg-[#171717] text-zinc-300 text-xs rounded-lg px-3 py-2 border border-[#333] focus:outline-none nodrag"
-                  value={fileType}
+                  value={effectiveFileType}
                   onChange={(e) => setFileType(e.target.value)}
+                  disabled={isVideo}
                 >
-                  {FILE_TYPES.map((ft) => (
+                  {fileTypes.map((ft) => (
                     <option key={ft.value} value={ft.value}>{ft.label}</option>
                   ))}
                 </select>
               </div>
 
-              {/* Size */}
-              <div className="flex flex-col gap-1">
-                <label className="text-[11px] text-zinc-500">Size</label>
-                <div className="grid grid-cols-4 gap-2 mb-1">
-                  {SCALES.map((s) => (
-                    <button
-                      key={s}
-                      className={`h-7 rounded-lg text-xs font-medium border transition-colors nodrag ${
-                        scale === s
-                          ? 'border-white/40 text-white bg-[#212121]'
-                          : 'border-[#333] text-zinc-400 hover:border-zinc-500'
-                      }`}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setScale(s);
-                      }}
-                    >
-                      {s}x
-                    </button>
-                  ))}
+              {/* Scale (image only) */}
+              {!isVideo && (
+                <div className="flex flex-col gap-1">
+                  <label className="text-[11px] text-zinc-500">Size</label>
+                  <div className="grid grid-cols-4 gap-2 mb-1">
+                    {SCALES.map((s) => (
+                      <button
+                        key={s}
+                        className={`h-7 rounded-lg text-xs font-medium border transition-colors nodrag ${
+                          scale === s
+                            ? 'border-white/40 text-white bg-[#212121]'
+                            : 'border-[#333] text-zinc-400 hover:border-zinc-500'
+                        }`}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setScale(s);
+                        }}
+                      >
+                        {s}x
+                      </button>
+                    ))}
+                  </div>
+                  {imgSize.w > 0 && (
+                    <span className="text-[10px] text-zinc-500">
+                      Export size: {exportW} × {exportH}px
+                    </span>
+                  )}
                 </div>
-                {imgSize.w > 0 && (
+              )}
+
+              {/* Video info */}
+              {isVideo && (cropData || imgSize.w > 0) && (
+                <div className="flex flex-col gap-1">
                   <span className="text-[10px] text-zinc-500">
-                    Export size: {exportW} × {exportH}px
+                    Resolution: {cropData ? cropData.cropW : imgSize.w} × {cropData ? cropData.cropH : imgSize.h}px
                   </span>
-                )}
-              </div>
+                </div>
+              )}
+
+              {/* Error message */}
+              {exportError && (
+                <p className="text-[10px] text-red-400 break-words">{exportError}</p>
+              )}
 
               {/* Export button */}
               <button
@@ -217,7 +330,7 @@ export function ExportNode(props: NodeProps) {
                     ? 'bg-[#333] text-zinc-400 cursor-wait'
                     : 'bg-white text-black hover:bg-zinc-200'
                 }`}
-                disabled={exporting || imgSize.w === 0}
+                disabled={exporting || (!isVideo && imgSize.w === 0)}
                 onClick={(e) => {
                   e.stopPropagation();
                   handleExport();
@@ -228,7 +341,7 @@ export function ExportNode(props: NodeProps) {
                     <Loader size={14} className="animate-spin" /> Exporting...
                   </span>
                 ) : (
-                  'Export'
+                  isVideo ? 'Export MP4' : 'Export'
                 )}
               </button>
             </div>

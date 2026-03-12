@@ -27,6 +27,25 @@ export function PreviewNode(props: NodeProps) {
   const inputUrl = resolved?.url ?? null;
   const isVideo = resolved?.mediaType === 'video';
 
+  // Get trim segments from upstream TrimVideo node (if any)
+  const trimSegments = useMemo(() => {
+    const incomingEdge = edges.find(
+      (e) => e.target === id && e.targetHandle &&
+        (e.targetHandle.includes('input:image') || e.targetHandle.includes('input:file') || e.targetHandle.includes('input:video'))
+    );
+    if (!incomingEdge) return null;
+    const sourceNode = allNodes.find((n) => n.id === incomingEdge.source);
+    if (!sourceNode) return null;
+    const sourceData = sourceNode.data as unknown as FlowNodeData;
+    if (!sourceData.results?.length) return null;
+    const result = sourceData.results[sourceData.selectedResultIndex || 0];
+    const segsStr = result?.video?.segments as string | undefined;
+    if (!segsStr) return null;
+    try {
+      return JSON.parse(segsStr) as { start: number; end: number }[];
+    } catch { return null; }
+  }, [edges, allNodes, id]);
+
   // Check for crop metadata from source node
   const cropData = useMemo(() => {
     const incomingEdge = edges.find(
@@ -108,9 +127,31 @@ export function PreviewNode(props: NodeProps) {
     }
 
     if (!video.paused) {
+      // Handle trim segments — skip gaps between segments
+      if (trimSegments && trimSegments.length > 0) {
+        const ct = video.currentTime;
+        const curSegIdx = trimSegments.findIndex(s => ct >= s.start - 0.02 && ct <= s.end + 0.02);
+        if (curSegIdx === -1) {
+          const nextSeg = trimSegments.find(s => s.start > ct - 0.05);
+          if (nextSeg) {
+            video.currentTime = nextSeg.start;
+          } else {
+            video.pause();
+            setIsPlaying(false);
+          }
+        } else if (ct > trimSegments[curSegIdx].end - 0.02) {
+          const nextSeg = trimSegments[curSegIdx + 1];
+          if (nextSeg) {
+            video.currentTime = nextSeg.start;
+          } else {
+            video.pause();
+            setIsPlaying(false);
+          }
+        }
+      }
       rafRef.current = requestAnimationFrame(drawFrame);
     }
-  }, [cropData]);
+  }, [cropData, trimSegments]);
 
   // Start/stop animation loop based on play state
   useEffect(() => {
@@ -126,15 +167,23 @@ export function PreviewNode(props: NodeProps) {
     const video = videoRef.current;
     if (!video) return;
     if (video.paused) {
+      // If we have trim segments, start from first segment if outside all segments
+      if (trimSegments && trimSegments.length > 0) {
+        const inSeg = trimSegments.some(s => video.currentTime >= s.start && video.currentTime <= s.end);
+        if (!inSeg) {
+          const nextSeg = trimSegments.find(s => s.start > video.currentTime) || trimSegments[0];
+          video.currentTime = nextSeg.start;
+          setCurrentTime(nextSeg.start);
+        }
+      }
       video.play();
       setIsPlaying(true);
-      // Restart rAF loop
       rafRef.current = requestAnimationFrame(drawFrame);
     } else {
       video.pause();
       setIsPlaying(false);
     }
-  }, [drawFrame]);
+  }, [drawFrame, trimSegments]);
 
   const handleSeek = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const video = videoRef.current;
@@ -264,8 +313,8 @@ export function PreviewNode(props: NodeProps) {
                       const v = e.currentTarget;
                       setImgNatural({ w: v.videoWidth, h: v.videoHeight });
                       setDuration(v.duration);
-                      // Force load first frame so canvas draws immediately
-                      v.currentTime = 0.001;
+                      // Start at first segment if trimmed, otherwise at beginning
+                      v.currentTime = trimSegments?.[0]?.start ?? 0.001;
                     }}
                     onEnded={() => setIsPlaying(false)}
                   />
@@ -298,7 +347,7 @@ export function PreviewNode(props: NodeProps) {
                         {isPlaying ? <Pause size={14} /> : <Play size={14} />}
                       </button>
                       <span className="text-[10px] text-zinc-300">
-                        {formatTime(currentTime)} / {formatTime(duration)}
+                        {formatTime(currentTime)} / {formatTime(trimSegments ? trimSegments.reduce((acc, s) => acc + (s.end - s.start), 0) : duration)}
                       </span>
                     </div>
                   </div>

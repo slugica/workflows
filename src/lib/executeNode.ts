@@ -215,6 +215,304 @@ function parseFalResult(result: Record<string, unknown>, model: ModelDef): FlowN
   return parsed;
 }
 
+// ── Rendi (FFmpeg) execution for utility nodes ─────────────────────────────
+
+async function executeRendi(body: {
+  input_files: Record<string, string>;
+  output_files: Record<string, string>;
+  ffmpeg_command: string;
+}): Promise<{ success: boolean; url?: string; error?: string }> {
+  const res = await fetch('/api/rendi', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+  const json = await res.json();
+  if (!res.ok || json.error) {
+    return { success: false, error: json.error || `HTTP ${res.status}` };
+  }
+  // Get the first output file URL
+  const outputs = json.output_files;
+  if (outputs) {
+    const firstKey = Object.keys(outputs)[0];
+    if (firstKey && outputs[firstKey]?.storage_url) {
+      return { success: true, url: outputs[firstKey].storage_url };
+    }
+  }
+  return { success: false, error: 'No output file returned from Rendi' };
+}
+
+function getSourceVideoUrl(nodeId: string, nodes: Node[], edges: Edge[]): string | null {
+  const inEdge = edges.find(
+    (e) => e.target === nodeId && e.targetHandle &&
+      (e.targetHandle.includes('input:video') || e.targetHandle.includes('input:file'))
+  );
+  if (!inEdge) return null;
+  const sourceNode = nodes.find((n) => n.id === inEdge.source);
+  if (!sourceNode) return null;
+  const sourceData = getNodeData(sourceNode);
+  // Check results first (e.g. from CropNode or other processing nodes)
+  if (sourceData.results?.length) {
+    const result = sourceData.results[sourceData.selectedResultIndex || 0];
+    if (result) {
+      const entry = result.file || result.video;
+      if (entry?.content) return entry.content as string;
+    }
+  }
+  // Fallback to import node URLs
+  return (sourceData.settings.remoteUrl || sourceData.settings.fileUrl) as string || null;
+}
+
+async function executeCropNode(nodeId: string, nodes: Node[], edges: Edge[]): Promise<ExecutionResult> {
+  const node = nodes.find((n) => n.id === nodeId);
+  if (!node) return { success: false, error: 'Node not found' };
+  const data = getNodeData(node);
+
+  const videoUrl = getSourceVideoUrl(nodeId, nodes, edges);
+  if (!videoUrl) return { success: false, error: 'No video input connected' };
+
+  // Get crop data from results (set by CropNode UI)
+  const result = data.results?.[0];
+  const cropEntry = result?.file;
+  if (!cropEntry?.cropW || !cropEntry?.cropH) {
+    return { success: false, error: 'No crop selection — adjust the crop area first' };
+  }
+
+  const { cropX, cropY, cropW, cropH } = cropEntry as unknown as { cropX: number; cropY: number; cropW: number; cropH: number };
+
+  const rendiResult = await executeRendi({
+    input_files: { in_video: videoUrl },
+    output_files: { out_video: 'cropped.mp4' },
+    ffmpeg_command: `-i {{in_video}} -vf "crop=${cropW}:${cropH}:${cropX}:${cropY}" -c:a copy {{out_video}}`,
+  });
+
+  if (!rendiResult.success) return { success: false, error: rendiResult.error };
+  return {
+    success: true,
+    results: [{ file: { content: rendiResult.url!, format: 'video', cropX, cropY, cropW, cropH, naturalW: cropW, naturalH: cropH } }],
+  };
+}
+
+async function executeTrimNode(nodeId: string, nodes: Node[], edges: Edge[]): Promise<ExecutionResult> {
+  const node = nodes.find((n) => n.id === nodeId);
+  if (!node) return { success: false, error: 'Node not found' };
+  const data = getNodeData(node);
+
+  const videoUrl = getSourceVideoUrl(nodeId, nodes, edges);
+  if (!videoUrl) return { success: false, error: 'No video input connected' };
+
+  const segments = data.settings.segments as { start: number; end: number }[] | undefined;
+  if (!segments || segments.length === 0) {
+    return { success: false, error: 'No trim segments defined' };
+  }
+
+  if (segments.length === 1) {
+    // Simple trim — single segment
+    const { start, end } = segments[0];
+    const rendiResult = await executeRendi({
+      input_files: { in_video: videoUrl },
+      output_files: { out_video: 'trimmed.mp4' },
+      ffmpeg_command: `-i {{in_video}} -ss ${start.toFixed(3)} -to ${end.toFixed(3)} -c:v libx264 -c:a aac {{out_video}}`,
+    });
+    if (!rendiResult.success) return { success: false, error: rendiResult.error };
+    return {
+      success: true,
+      results: [{ video: { content: rendiResult.url!, format: 'video' } }],
+    };
+  }
+
+  // Multiple segments — build complex filter to concat
+  // Try with audio first, fallback to video-only if it fails (no audio stream)
+  function buildMultiSegmentFilter(withAudio: boolean) {
+    const parts: string[] = [];
+    for (let i = 0; i < segments.length; i++) {
+      const { start, end } = segments[i];
+      parts.push(`[0:v]trim=start=${start.toFixed(3)}:end=${end.toFixed(3)},setpts=PTS-STARTPTS[v${i}]`);
+      if (withAudio) {
+        parts.push(`[0:a]atrim=start=${start.toFixed(3)}:end=${end.toFixed(3)},asetpts=PTS-STARTPTS[a${i}]`);
+      }
+    }
+    const inputs = segments.map((_, i) => withAudio ? `[v${i}][a${i}]` : `[v${i}]`).join('');
+    parts.push(`${inputs}concat=n=${segments.length}:v=1:a=${withAudio ? 1 : 0}${withAudio ? '[outv][outa]' : '[outv]'}`);
+    return parts.join(';');
+  }
+
+  // Try with audio
+  let rendiResult = await executeRendi({
+    input_files: { in_video: videoUrl },
+    output_files: { out_video: 'trimmed.mp4' },
+    ffmpeg_command: `-i {{in_video}} -filter_complex "${buildMultiSegmentFilter(true)}" -map "[outv]" -map "[outa]" {{out_video}}`,
+  });
+
+  // Fallback: retry without audio
+  if (!rendiResult.success) {
+    rendiResult = await executeRendi({
+      input_files: { in_video: videoUrl },
+      output_files: { out_video: 'trimmed.mp4' },
+      ffmpeg_command: `-i {{in_video}} -filter_complex "${buildMultiSegmentFilter(false)}" -map "[outv]" -an {{out_video}}`,
+    });
+  }
+
+  if (!rendiResult.success) return { success: false, error: rendiResult.error };
+  return {
+    success: true,
+    results: [{ video: { content: rendiResult.url!, format: 'video' } }],
+  };
+}
+
+// ── Export node: walk chain, collect operations, execute via Rendi ───────────
+
+interface VideoOp {
+  type: 'crop' | 'trim';
+  cropX?: number; cropY?: number; cropW?: number; cropH?: number;
+  segments?: { start: number; end: number }[];
+}
+
+/**
+ * Walk backwards from a node through the chain of connected nodes.
+ * Collects the source video URL and any operations (crop, trim) along the way.
+ */
+function walkChain(nodeId: string, nodes: Node[], edges: Edge[]): { sourceUrl: string | null; ops: VideoOp[] } {
+  const ops: VideoOp[] = [];
+  let currentId = nodeId;
+
+  for (let depth = 0; depth < 20; depth++) {
+    const node = nodes.find((n) => n.id === currentId);
+    if (!node) break;
+    const data = getNodeData(node);
+
+    // Collect operation from this node
+    if (node.type === 'crop') {
+      const result = data.results?.[0];
+      const entry = result?.file;
+      if (entry?.cropW && entry?.cropH) {
+        ops.unshift({
+          type: 'crop',
+          cropX: entry.cropX as number,
+          cropY: entry.cropY as number,
+          cropW: entry.cropW as number,
+          cropH: entry.cropH as number,
+        });
+      }
+    } else if (node.type === 'trimVideo') {
+      const segments = data.settings.segments as { start: number; end: number }[] | undefined;
+      if (segments?.length) {
+        ops.unshift({ type: 'trim', segments });
+      }
+    } else if (node.type === 'import') {
+      // Found the source
+      const url = (data.settings.remoteUrl || data.settings.fileUrl) as string;
+      return { sourceUrl: url || null, ops };
+    }
+
+    // Walk to the upstream node
+    const inEdge = edges.find(
+      (e) => e.target === currentId && e.targetHandle &&
+        (e.targetHandle.includes('input:video') || e.targetHandle.includes('input:file'))
+    );
+    if (!inEdge) break;
+    currentId = inEdge.source;
+  }
+
+  return { sourceUrl: null, ops };
+}
+
+/**
+ * Build ffmpeg filter chain from collected operations.
+ * Returns { filters, inputArgs, outputArgs } to construct the full command.
+ */
+function buildFfmpegFromOps(ops: VideoOp[], withAudio: boolean): { vFilters: string[]; trimArgs: { ss?: string; to?: string } | null; complexFilter: string | null } {
+  const vFilters: string[] = [];
+  let trimArgs: { ss?: string; to?: string } | null = null;
+  let complexFilter: string | null = null;
+
+  for (const op of ops) {
+    if (op.type === 'crop' && op.cropW && op.cropH) {
+      vFilters.push(`crop=${op.cropW}:${op.cropH}:${op.cropX}:${op.cropY}`);
+    } else if (op.type === 'trim' && op.segments?.length) {
+      if (op.segments.length === 1) {
+        trimArgs = {
+          ss: op.segments[0].start.toFixed(3),
+          to: op.segments[0].end.toFixed(3),
+        };
+      } else {
+        // Multi-segment: need filter_complex with concat
+        const parts: string[] = [];
+        for (let i = 0; i < op.segments.length; i++) {
+          const { start, end } = op.segments[i];
+          const extraVf = vFilters.length > 0 ? ',' + vFilters.join(',') : '';
+          parts.push(`[0:v]trim=start=${start.toFixed(3)}:end=${end.toFixed(3)},setpts=PTS-STARTPTS${extraVf}[v${i}]`);
+          if (withAudio) {
+            parts.push(`[0:a]atrim=start=${start.toFixed(3)}:end=${end.toFixed(3)},asetpts=PTS-STARTPTS[a${i}]`);
+          }
+        }
+        const concatInputs = op.segments.map((_, i) => withAudio ? `[v${i}][a${i}]` : `[v${i}]`).join('');
+        parts.push(`${concatInputs}concat=n=${op.segments.length}:v=1:a=${withAudio ? 1 : 0}${withAudio ? '[outv][outa]' : '[outv]'}`);
+        complexFilter = parts.join(';');
+        // Clear vFilters since they're included in the complex filter
+        vFilters.length = 0;
+      }
+    }
+  }
+
+  return { vFilters, trimArgs, complexFilter };
+}
+
+export async function executeExportNode(
+  nodeId: string,
+  nodes: Node[],
+  edges: Edge[]
+): Promise<ExecutionResult> {
+  const { sourceUrl, ops } = walkChain(nodeId, nodes, edges);
+  if (!sourceUrl) return { success: false, error: 'No video source found in chain' };
+
+  // No operations — just pass through the source URL
+  if (ops.length === 0) {
+    return {
+      success: true,
+      results: [{ file: { content: sourceUrl, format: 'video' } }],
+    };
+  }
+
+  function buildCommand(withAudio: boolean): string {
+    const { vFilters: vf, trimArgs: ta, complexFilter: cf } = buildFfmpegFromOps(ops, withAudio);
+
+    if (cf) {
+      const mapArgs = withAudio ? '-map "[outv]" -map "[outa]"' : '-map "[outv]" -an';
+      return `-i {{in_video}} -filter_complex "${cf}" ${mapArgs} {{out_video}}`;
+    }
+
+    const parts: string[] = [];
+    if (ta?.ss) parts.push(`-ss ${ta.ss}`);
+    if (ta?.to) parts.push(`-to ${ta.to}`);
+    parts.push('-i {{in_video}}');
+    if (vf.length > 0) parts.push(`-vf "${vf.join(',')}"`);
+    parts.push('-c:a copy {{out_video}}');
+    return parts.join(' ');
+  }
+
+  // Try with audio first, fallback to video-only
+  let rendiResult = await executeRendi({
+    input_files: { in_video: sourceUrl },
+    output_files: { out_video: 'export.mp4' },
+    ffmpeg_command: buildCommand(true),
+  });
+
+  if (!rendiResult.success) {
+    rendiResult = await executeRendi({
+      input_files: { in_video: sourceUrl },
+      output_files: { out_video: 'export.mp4' },
+      ffmpeg_command: buildCommand(false),
+    });
+  }
+
+  if (!rendiResult.success) return { success: false, error: rendiResult.error };
+  return {
+    success: true,
+    results: [{ file: { content: rendiResult.url!, format: 'video' } }],
+  };
+}
+
 // ── Main execute function ───────────────────────────────────────────────────
 
 export async function executeNode(
@@ -226,6 +524,12 @@ export async function executeNode(
   if (!node) return { success: false, error: 'Node not found' };
 
   const data = getNodeData(node);
+
+  // Route utility nodes to Rendi (FFmpeg)
+  if (node.type === 'crop') return executeCropNode(nodeId, nodes, edges);
+  if (node.type === 'trimVideo') return executeTrimNode(nodeId, nodes, edges);
+  if (node.type === 'export') return executeExportNode(nodeId, nodes, edges);
+
   const modelId = data.settings.modelId as string;
   if (!modelId) return { success: false, error: 'No model assigned to this node' };
 
