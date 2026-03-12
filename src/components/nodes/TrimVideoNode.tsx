@@ -2,7 +2,7 @@
 
 import { useRef, useCallback, useMemo, useState, useEffect } from 'react';
 import { Handle, Position, useEdges, useNodes, type NodeProps } from '@xyflow/react';
-import { FlowNodeData, HANDLE_COLORS } from '@/lib/types';
+import { FlowNodeData, HANDLE_COLORS, resolveFileHandleColor } from '@/lib/types';
 import { resolveInput } from '@/lib/resolveInput';
 import { useFlowStore } from '@/store/flowStore';
 import { Scissors, Play, Pause, Volume2, VolumeX, Undo2, Redo2, SplitSquareHorizontal, ArrowLeftToLine, ArrowRightToLine } from 'lucide-react';

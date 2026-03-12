@@ -10,7 +10,7 @@ import {
   Connection,
   addEdge,
 } from '@xyflow/react';
-import { FlowNodeData, FlowNodeType, NODE_TEMPLATES, HandleDef, HANDLE_COLORS, HandleDataType } from '@/lib/types';
+import { FlowNodeData, FlowNodeType, NODE_TEMPLATES, HandleDef } from '@/lib/types';
 import { executeNode } from '@/lib/executeNode';
 
 interface Snapshot {
@@ -136,12 +136,10 @@ export const useFlowStore = create<FlowState>((set, get) => ({
     // Replace existing connection to the same target handle (allows reconnecting)
     const filteredEdges = get().edges.filter((e) => e.targetHandle !== targetHandle);
 
-    const edgeColor = HANDLE_COLORS[sourceType as HandleDataType] || '#52525b';
     const newEdge: Edge = {
       ...connection,
       id: `${connection.source}-${connection.target}-${generateId()}`,
-      type: 'default',
-      style: { stroke: edgeColor, strokeWidth: 2 },
+      type: 'dynamic',
     };
     const newEdges = addEdge(newEdge, filteredEdges);
 
@@ -365,13 +363,13 @@ export const useFlowStore = create<FlowState>((set, get) => ({
   },
 
   uploadFileToNewNode: (file, position) => {
-    // Determine template based on file type
-    let templateLabel = 'Upload';
-    if (file.type.startsWith('image/')) templateLabel = 'Image';
-    else if (file.type.startsWith('video/')) templateLabel = 'Video';
-
+    const MAX_SIZE = 30 * 1024 * 1024; // 30MB
+    if (file.size > MAX_SIZE) {
+      console.warn(`File too large (${(file.size / 1024 / 1024).toFixed(1)}MB). Max 30MB.`);
+      return;
+    }
     // Create the node
-    get().addNode('import', templateLabel, position);
+    get().addNode('import', 'Import', position);
 
     // Get the newly created node (last selected)
     const nodeId = get().selectedNodeId;

@@ -9,6 +9,8 @@ import {
   SelectionMode,
   useViewport,
   useReactFlow,
+  useEdges,
+  useNodes,
   Panel,
   type NodeTypes,
   type IsValidConnection,
@@ -35,22 +37,41 @@ import { RelightNode } from '@/components/nodes/RelightNode';
 import { CameraAnglesNode } from '@/components/nodes/CameraAnglesNode';
 import { SectionNode } from '@/components/nodes/SectionNode';
 import { TrimVideoNode } from '@/components/nodes/TrimVideoNode';
-import { FlowNodeType, HANDLE_COLORS, type FlowNodeData } from '@/lib/types';
+import { FlowNodeType, HANDLE_COLORS, resolveFileHandleColor, type FlowNodeData } from '@/lib/types';
 
-function CustomConnectionLine({ fromX, fromY, toX, toY, fromPosition, toPosition, fromNode, fromHandle }: ConnectionLineComponentProps) {
-  const handleId = fromHandle?.id || '';
-  const nodeData = fromNode?.data as unknown as FlowNodeData | undefined;
+import { BaseEdge, type EdgeProps } from '@xyflow/react';
+
+/** Resolve edge/connection color from a source node + handle. */
+function useSourceHandleColor(nodeId: string | undefined, handleId: string | undefined): string {
+  const rfNodes = useNodes();
+  const rfEdges = useEdges();
+  const node = rfNodes.find(n => n.id === nodeId);
+  const nodeData = node?.data as unknown as FlowNodeData | undefined;
   const handle = nodeData?.handles.outputs.find(h => h.id === handleId)
     || nodeData?.handles.inputs.find(h => h.id === handleId);
-  const color = handle ? HANDLE_COLORS[handle.type] : '#52525b';
+  if (!handle) return '#52525b';
+  if (handle.type !== 'file') return HANDLE_COLORS[handle.type];
+  if (!nodeData || !node) return HANDLE_COLORS.file;
+  return resolveFileHandleColor('output', nodeData, handleId || '', rfEdges, node.id, rfNodes);
+}
 
+function CustomConnectionLine({ fromX, fromY, toX, toY, fromPosition, toPosition, fromNode, fromHandle }: ConnectionLineComponentProps) {
+  const color = useSourceHandleColor(fromNode?.id, fromHandle?.id || '');
   const [path] = getBezierPath({
     sourceX: fromX, sourceY: fromY, sourcePosition: fromPosition,
     targetX: toX, targetY: toY, targetPosition: toPosition,
   });
-
   return <path d={path} fill="none" stroke={color} strokeWidth={2} />;
 }
+
+function DynamicEdge(props: EdgeProps) {
+  const { sourceX, sourceY, targetX, targetY, sourcePosition, targetPosition, source, sourceHandleId } = props;
+  const color = useSourceHandleColor(source, sourceHandleId || undefined);
+  const [path] = getBezierPath({ sourceX, sourceY, sourcePosition, targetX, targetY, targetPosition });
+  return <BaseEdge path={path} style={{ stroke: color, strokeWidth: 2 }} />;
+}
+
+const edgeTypes = { dynamic: DynamicEdge };
 
 const nodeTypes: NodeTypes = {
   import: BaseNode,
@@ -541,10 +562,10 @@ export function FlowCanvas() {
         fitView
         fitViewOptions={{ maxZoom: 1 }}
         colorMode="dark"
+        edgeTypes={edgeTypes}
         defaultEdgeOptions={{
-          type: 'default',
+          type: 'dynamic',
           animated: false,
-          style: { strokeWidth: 2 },
         }}
         connectionLineComponent={CustomConnectionLine}
         proOptions={{ hideAttribution: true }}

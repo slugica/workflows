@@ -323,17 +323,18 @@ async function executeTrimNode(nodeId: string, nodes: Node[], edges: Edge[]): Pr
 
   // Multiple segments — build complex filter to concat
   // Try with audio first, fallback to video-only if it fails (no audio stream)
+  const segs = segments; // narrowed: segments is defined and length > 1 here
   function buildMultiSegmentFilter(withAudio: boolean) {
     const parts: string[] = [];
-    for (let i = 0; i < segments.length; i++) {
-      const { start, end } = segments[i];
+    for (let i = 0; i < segs.length; i++) {
+      const { start, end } = segs[i];
       parts.push(`[0:v]trim=start=${start.toFixed(3)}:end=${end.toFixed(3)},setpts=PTS-STARTPTS[v${i}]`);
       if (withAudio) {
         parts.push(`[0:a]atrim=start=${start.toFixed(3)}:end=${end.toFixed(3)},asetpts=PTS-STARTPTS[a${i}]`);
       }
     }
-    const inputs = segments.map((_, i) => withAudio ? `[v${i}][a${i}]` : `[v${i}]`).join('');
-    parts.push(`${inputs}concat=n=${segments.length}:v=1:a=${withAudio ? 1 : 0}${withAudio ? '[outv][outa]' : '[outv]'}`);
+    const inputs = segs.map((_, i) => withAudio ? `[v${i}][a${i}]` : `[v${i}]`).join('');
+    parts.push(`${inputs}concat=n=${segs.length}:v=1:a=${withAudio ? 1 : 0}${withAudio ? '[outv][outa]' : '[outv]'}`);
     return parts.join(';');
   }
 

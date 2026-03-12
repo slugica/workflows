@@ -50,8 +50,82 @@ export const HANDLE_COLORS: Record<HandleDataType, string> = {
   text: '#3CB8FF',
   video: '#4ADE80',
   audio: '#F472B6',
-  file: '#FCB84A',
+  file: '#9CA3AF',
 };
+
+/** Detect media color from a node's settings/results. Returns null if unknown. */
+function detectMediaColor(nodeData: FlowNodeData): string | null {
+  const ft = nodeData.settings.fileType as string | undefined;
+  if (ft?.startsWith('video/')) return HANDLE_COLORS.video;
+  if (ft?.startsWith('image/')) return HANDLE_COLORS.image;
+  if (ft?.startsWith('audio/')) return HANDLE_COLORS.audio;
+  if (nodeData.results?.length) {
+    const result = nodeData.results[nodeData.selectedResultIndex || 0];
+    if (result) {
+      const entry = Object.values(result)[0];
+      if (entry?.format === 'video') return HANDLE_COLORS.video;
+      if (entry?.format === 'image') return HANDLE_COLORS.image;
+    }
+  }
+  return null;
+}
+
+/**
+ * Resolve the effective color for a `file` type handle based on media context.
+ * Returns the media-specific color (video=green, image=yellow) or default file color (gray).
+ */
+export function resolveFileHandleColor(
+  direction: 'input' | 'output',
+  nodeData: FlowNodeData,
+  handleId: string,
+  edges: import('@xyflow/react').Edge[],
+  nodeId: string,
+  allNodes?: import('@xyflow/react').Node[],
+): string {
+  if (direction === 'output') {
+    const own = detectMediaColor(nodeData);
+    if (own) return own;
+    // Pass-through: inherit color from connected input's source
+    if (allNodes) {
+      const inEdge = edges.find(e => e.target === nodeId && e.targetHandle &&
+        (e.targetHandle.includes('input:file') || e.targetHandle.includes('input:image') || e.targetHandle.includes('input:video'))
+      );
+      if (inEdge) {
+        const srcNode = allNodes.find(n => n.id === inEdge.source);
+        if (srcNode) {
+          const srcColor = detectMediaColor(srcNode.data as unknown as FlowNodeData);
+          if (srcColor) return srcColor;
+        }
+      }
+    }
+    return HANDLE_COLORS.file;
+  }
+
+  // Input handle: check what's connected
+  const edge = edges.find(e => e.target === nodeId && e.targetHandle === handleId);
+  if (!edge?.sourceHandle) return HANDLE_COLORS.file;
+
+  // Parse source handle: {nodeId}|output:{type}:{key}
+  const parts = edge.sourceHandle.split('|');
+  if (parts.length === 2) {
+    const segs = parts[1].split(':');
+    if (segs.length === 3) {
+      const srcType = segs[1] as HandleDataType;
+      if (srcType !== 'file') return HANDLE_COLORS[srcType] || HANDLE_COLORS.file;
+    }
+  }
+
+  // Source is also `file` — check source node's data
+  if (allNodes) {
+    const srcNode = allNodes.find(n => n.id === edge.source);
+    if (srcNode) {
+      const srcColor = detectMediaColor(srcNode.data as unknown as FlowNodeData);
+      if (srcColor) return srcColor;
+    }
+  }
+
+  return HANDLE_COLORS.file;
+}
 
 import { MODEL_REGISTRY, getDefaultSettings } from './modelRegistry';
 
@@ -59,7 +133,7 @@ import { MODEL_REGISTRY, getDefaultSettings } from './modelRegistry';
 const STATIC_TEMPLATES: NodeTemplate[] = [
   {
     type: 'import',
-    label: 'Upload',
+    label: 'Import',
     category: 'Essentials',
     defaultData: {
       behavior: 'static',
@@ -67,33 +141,7 @@ const STATIC_TEMPLATES: NodeTemplate[] = [
         inputs: [],
         outputs: [{ id: '', key: 'file', label: 'File', type: 'file' }],
       },
-      settings: { allowedFileTypes: ['image/jpeg', 'image/png', 'image/webp'] },
-    },
-  },
-  {
-    type: 'import',
-    label: 'Image',
-    category: 'Essentials',
-    defaultData: {
-      behavior: 'static',
-      handles: {
-        inputs: [],
-        outputs: [{ id: '', key: 'file', label: 'File', type: 'file' }],
-      },
-      settings: { allowedFileTypes: ['image/jpeg', 'image/png', 'image/webp', 'image/gif'] },
-    },
-  },
-  {
-    type: 'import',
-    label: 'Video',
-    category: 'Essentials',
-    defaultData: {
-      behavior: 'static',
-      handles: {
-        inputs: [],
-        outputs: [{ id: '', key: 'file', label: 'File', type: 'file' }],
-      },
-      settings: { allowedFileTypes: ['video/mp4', 'video/webm', 'video/mov'] },
+      settings: { allowedFileTypes: ['image/jpeg', 'image/png', 'image/webp', 'image/gif', 'video/mp4', 'video/webm', 'video/mov', 'audio/mpeg', 'audio/wav'] },
     },
   },
   {

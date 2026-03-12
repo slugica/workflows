@@ -1,8 +1,8 @@
 'use client';
 
 import { useRef, useCallback, useMemo, useState, type ReactNode } from 'react';
-import { Handle, Position, useEdges, NodeResizer, type NodeProps } from '@xyflow/react';
-import { FlowNodeData, HANDLE_COLORS } from '@/lib/types';
+import { Handle, Position, useEdges, useNodes, NodeResizer, type NodeProps } from '@xyflow/react';
+import { FlowNodeData, HANDLE_COLORS, resolveFileHandleColor } from '@/lib/types';
 import { useFlowStore } from '@/store/flowStore';
 import { Upload, Type, ImageIcon, Video, AudioLines, Play, Loader, ChevronLeft, ChevronRight, Trash2 } from 'lucide-react';
 
@@ -17,9 +17,9 @@ const TYPE_ICONS: Record<string, ReactNode> = {
 const TYPE_LABELS: Record<string, string> = {
   import: 'Import',
   prompt: 'Prompt',
-  image: 'Image',
-  video: 'Video',
-  audio: 'Audio',
+  image: 'Generate',
+  video: 'Generate',
+  audio: 'Generate',
 };
 
 export function BaseNode(props: NodeProps) {
@@ -29,6 +29,7 @@ export function BaseNode(props: NodeProps) {
   const nodeType: string = String(props.type || 'import');
   const fileInputRef = useRef<HTMLInputElement>(null);
   const edges = useEdges();
+  const allNodes = useNodes();
   const connectedHandles = useMemo(() => {
     const set = new Set<string>();
     for (const e of edges) {
@@ -60,7 +61,15 @@ export function BaseNode(props: NodeProps) {
     return { w: Math.round(cw), h: Math.round(ch) };
   }, [imgNatural]);
 
+  const [uploadError, setUploadError] = useState<string | null>(null);
+
   const handleFileSelect = useCallback(async (file: File) => {
+    const MAX_SIZE = 30 * 1024 * 1024; // 30MB
+    if (file.size > MAX_SIZE) {
+      setUploadError(`File too large (${(file.size / 1024 / 1024).toFixed(1)}MB). Max 30MB.`);
+      return;
+    }
+    setUploadError(null);
     const store = useFlowStore.getState();
     const localUrl = URL.createObjectURL(file);
     store.updateNodeSetting(id, 'fileName', file.name);
@@ -151,6 +160,9 @@ export function BaseNode(props: NodeProps) {
           <div className="pointer-events-none absolute top-[68px] -left-[10px] flex flex-col items-center justify-center gap-6">
             {data.handles.inputs.map((handle, i) => {
               const isConnected = connectedHandles.has(handle.id);
+              const color = handle.type === 'file'
+                ? resolveFileHandleColor('input', data, handle.id, edges, id, allNodes)
+                : HANDLE_COLORS[handle.type];
               return (
                 <Handle
                   key={handle.id || i}
@@ -159,13 +171,13 @@ export function BaseNode(props: NodeProps) {
                   id={handle.id}
                   className="!relative !transform-none !w-[18px] !h-[18px] !rounded-full !border-2 !left-0 !top-0 !flex !items-center !justify-center"
                   style={{
-                    backgroundColor: isConnected ? HANDLE_COLORS[handle.type] : '#171717',
-                    borderColor: HANDLE_COLORS[handle.type],
+                    backgroundColor: isConnected ? color : '#171717',
+                    borderColor: color,
                   }}
                 >
                   <span
                     className="handle-label absolute top-[-20px] right-[14px] whitespace-nowrap text-sm font-medium opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none"
-                    style={{ color: HANDLE_COLORS[handle.type] }}
+                    style={{ color }}
                   >
                     {handle.label}{handle.required ? ' *' : ''}
                   </span>
@@ -179,6 +191,9 @@ export function BaseNode(props: NodeProps) {
           <div className="pointer-events-none absolute top-[68px] -right-[10px] flex flex-col items-center justify-center gap-6">
             {data.handles.outputs.map((handle, i) => {
               const isConnected = connectedHandles.has(handle.id);
+              const color = handle.type === 'file'
+                ? resolveFileHandleColor('output', data, handle.id, edges, id, allNodes)
+                : HANDLE_COLORS[handle.type];
               return (
                 <Handle
                   key={handle.id || i}
@@ -187,13 +202,13 @@ export function BaseNode(props: NodeProps) {
                   id={handle.id}
                   className="!relative !transform-none !w-[18px] !h-[18px] !rounded-full !border-2 !left-0 !top-0 !flex !items-center !justify-center"
                   style={{
-                    backgroundColor: isConnected ? HANDLE_COLORS[handle.type] : '#171717',
-                    borderColor: HANDLE_COLORS[handle.type],
+                    backgroundColor: isConnected ? color : '#171717',
+                    borderColor: color,
                   }}
                 >
                   <span
                     className="handle-label absolute top-[-20px] left-[24px] whitespace-nowrap text-sm font-medium opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none"
-                    style={{ color: HANDLE_COLORS[handle.type] }}
+                    style={{ color }}
                   >
                     {handle.label}{handle.required ? ' *' : ''}
                   </span>
@@ -265,7 +280,7 @@ export function BaseNode(props: NodeProps) {
             ) : (
               <label
                 htmlFor={`file-input-${id}`}
-                className="bg-[#212121] rounded-2xl p-8 text-center cursor-pointer hover:bg-[#292929] transition-colors nodrag block aspect-square flex items-center justify-center"
+                className="bg-[#212121] rounded-2xl p-8 text-center cursor-pointer hover:bg-[#292929] transition-colors nodrag block aspect-square flex flex-col items-center justify-center gap-2"
                 onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); }}
                 onDrop={(e) => {
                   e.preventDefault();
@@ -274,7 +289,10 @@ export function BaseNode(props: NodeProps) {
                   if (file) handleFileSelect(file);
                 }}
               >
-                <span className="text-zinc-500 text-sm">Drop file or click to upload</span>
+                <Upload size={20} className="text-zinc-500" />
+                <span className="text-zinc-400 text-sm">Drag & drop or Click to upload</span>
+                <span className="text-zinc-600 text-[11px]">JPG, PNG, WEBP, MP4, MP3, WAV, up to 30MB</span>
+                {uploadError && <span className="text-red-400 text-[11px] mt-1">{uploadError}</span>}
               </label>
             )}
           </div>

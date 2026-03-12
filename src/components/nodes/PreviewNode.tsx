@@ -2,7 +2,7 @@
 
 import { useMemo, useState, useRef, useEffect, useCallback } from 'react';
 import { Handle, Position, useEdges, useNodes, type NodeProps } from '@xyflow/react';
-import { FlowNodeData, HANDLE_COLORS } from '@/lib/types';
+import { FlowNodeData, HANDLE_COLORS, resolveFileHandleColor } from '@/lib/types';
 import { resolveInput } from '@/lib/resolveInput';
 import { useFlowStore } from '@/store/flowStore';
 import { ScanLine, Play, Pause } from 'lucide-react';
@@ -242,6 +242,9 @@ export function PreviewNode(props: NodeProps) {
         <div className="pointer-events-none absolute top-[68px] -left-[10px] flex flex-col items-center justify-center gap-6">
           {data.handles.inputs.map((handle, i) => {
             const isConnected = connectedHandles.has(handle.id);
+            const color = handle.type === 'file'
+              ? resolveFileHandleColor('input', data, handle.id, edges, id, allNodes)
+              : HANDLE_COLORS[handle.type];
             return (
               <Handle
                 key={handle.id || i}
@@ -250,13 +253,13 @@ export function PreviewNode(props: NodeProps) {
                 id={handle.id}
                 className="!relative !transform-none !w-[18px] !h-[18px] !rounded-full !border-2 !left-0 !top-0 !flex !items-center !justify-center"
                 style={{
-                  backgroundColor: isConnected ? HANDLE_COLORS[handle.type] : '#171717',
-                  borderColor: HANDLE_COLORS[handle.type],
+                  backgroundColor: isConnected ? color : '#171717',
+                  borderColor: color,
                 }}
               >
                 <span
                   className="handle-label absolute top-[-20px] right-[14px] whitespace-nowrap text-sm font-medium opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none"
-                  style={{ color: HANDLE_COLORS[handle.type] }}
+                  style={{ color }}
                 >
                   {handle.label}{handle.required ? ' *' : ''}
                 </span>
@@ -269,6 +272,9 @@ export function PreviewNode(props: NodeProps) {
         <div className="pointer-events-none absolute top-[68px] -right-[10px] flex flex-col items-center justify-center gap-6">
           {data.handles.outputs.map((handle, i) => {
             const isConnected = connectedHandles.has(handle.id);
+            const color = handle.type === 'file'
+              ? resolveFileHandleColor('output', data, handle.id, edges, id, allNodes)
+              : HANDLE_COLORS[handle.type];
             return (
               <Handle
                 key={handle.id || i}
@@ -277,13 +283,13 @@ export function PreviewNode(props: NodeProps) {
                 id={handle.id}
                 className="!relative !transform-none !w-[18px] !h-[18px] !rounded-full !border-2 !left-0 !top-0 !flex !items-center !justify-center"
                 style={{
-                  backgroundColor: isConnected ? HANDLE_COLORS[handle.type] : '#171717',
-                  borderColor: HANDLE_COLORS[handle.type],
+                  backgroundColor: isConnected ? color : '#171717',
+                  borderColor: color,
                 }}
               >
                 <span
                   className="handle-label absolute top-[-20px] left-[24px] whitespace-nowrap text-sm font-medium opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none"
-                  style={{ color: HANDLE_COLORS[handle.type] }}
+                  style={{ color }}
                 >
                   {handle.label}{handle.required ? ' *' : ''}
                 </span>
