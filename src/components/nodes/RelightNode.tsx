@@ -2,8 +2,9 @@
 
 import { useMemo } from 'react';
 import { Handle, Position, useEdges, useNodes, type NodeProps } from '@xyflow/react';
-import { FlowNodeData, HANDLE_COLORS } from '@/lib/types';
+import { FlowNodeData, HANDLE_COLORS, resolveFileHandleColor } from '@/lib/types';
 import { resolveInputImageUrl } from '@/lib/resolveInput';
+import { ensureRemoteUrl } from '@/lib/executeNode';
 import { useFlowStore } from '@/store/flowStore';
 import { Sun, Play, Loader, ChevronLeft, ChevronRight, Trash2 } from 'lucide-react';
 
@@ -83,6 +84,7 @@ export function RelightNode(props: NodeProps) {
     const prompt = buildRelightPrompt(azimuth, elevation, intensity, colorHex);
 
     try {
+      const remoteUrl = await ensureRemoteUrl(inputImageUrl);
       const res = await fetch('/api/fal', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -90,7 +92,7 @@ export function RelightNode(props: NodeProps) {
           modelId: 'fal-ai/nano-banana-2/edit',
           input: {
             prompt,
-            image_urls: [inputImageUrl],
+            image_urls: [remoteUrl],
             aspect_ratio: (data.settings.aspectRatio as string) || '3:4',
             resolution: (data.settings.resolution as string) || '1K',
             num_images: 1,
@@ -178,6 +180,7 @@ export function RelightNode(props: NodeProps) {
           <div className="pointer-events-none absolute top-[68px] -left-[10px] flex flex-col items-center justify-center gap-6">
             {data.handles.inputs.map((handle, i) => {
               const isConnected = connectedHandles.has(handle.id);
+              const color = handle.type === 'file' ? resolveFileHandleColor('input', data, handle.id, edges, id, allNodes) : HANDLE_COLORS[handle.type];
               return (
                 <Handle
                   key={handle.id || i}
@@ -186,13 +189,13 @@ export function RelightNode(props: NodeProps) {
                   id={handle.id}
                   className="!relative !transform-none !w-[18px] !h-[18px] !rounded-full !border-2 !left-0 !top-0 !flex !items-center !justify-center"
                   style={{
-                    backgroundColor: isConnected ? HANDLE_COLORS[handle.type] : '#171717',
-                    borderColor: HANDLE_COLORS[handle.type],
+                    backgroundColor: isConnected ? color : '#171717',
+                    borderColor: color,
                   }}
                 >
                   <span
                     className="handle-label absolute top-[-20px] right-[14px] whitespace-nowrap text-sm font-medium opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none"
-                    style={{ color: HANDLE_COLORS[handle.type] }}
+                    style={{ color }}
                   >
                     {handle.label}{handle.required ? ' *' : ''}
                   </span>
@@ -207,6 +210,7 @@ export function RelightNode(props: NodeProps) {
           <div className="pointer-events-none absolute top-[68px] -right-[10px] flex flex-col items-center justify-center gap-6">
             {data.handles.outputs.map((handle, i) => {
               const isConnected = connectedHandles.has(handle.id);
+              const color = handle.type === 'file' ? resolveFileHandleColor('output', data, handle.id, edges, id, allNodes) : HANDLE_COLORS[handle.type];
               return (
                 <Handle
                   key={handle.id || i}
@@ -215,13 +219,13 @@ export function RelightNode(props: NodeProps) {
                   id={handle.id}
                   className="!relative !transform-none !w-[18px] !h-[18px] !rounded-full !border-2 !left-0 !top-0 !flex !items-center !justify-center"
                   style={{
-                    backgroundColor: isConnected ? HANDLE_COLORS[handle.type] : '#171717',
-                    borderColor: HANDLE_COLORS[handle.type],
+                    backgroundColor: isConnected ? color : '#171717',
+                    borderColor: color,
                   }}
                 >
                   <span
                     className="handle-label absolute top-[-20px] left-[24px] whitespace-nowrap text-sm font-medium opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none"
-                    style={{ color: HANDLE_COLORS[handle.type] }}
+                    style={{ color }}
                   >
                     {handle.label}{handle.required ? ' *' : ''}
                   </span>

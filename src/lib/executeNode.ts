@@ -129,6 +129,41 @@ function resolveOutputValue(sourceData: FlowNodeData, sourceHandleId: string | n
   return undefined;
 }
 
+// ── Upload blob URLs to fal.ai storage ──────────────────────────────────────
+
+export async function uploadBlobToFal(blobUrl: string): Promise<string> {
+  const res = await fetch(blobUrl);
+  const blob = await res.blob();
+  const formData = new FormData();
+  formData.append('file', new File([blob], 'input.png', { type: blob.type || 'image/png' }));
+  const uploadRes = await fetch('/api/fal/upload', { method: 'POST', body: formData });
+  const json = await uploadRes.json();
+  if (!json.url) throw new Error(`Failed to upload blob: ${json.error || 'no URL returned'}`);
+  return json.url;
+}
+
+/** Ensure a URL is remote (upload blob URLs to fal.ai storage) */
+export async function ensureRemoteUrl(url: string): Promise<string> {
+  return url.startsWith('blob:') ? uploadBlobToFal(url) : url;
+}
+
+/** Replace any blob: URLs in collected inputs with remote fal.ai URLs */
+async function ensureRemoteUrls(inputs: CollectedInputs): Promise<CollectedInputs> {
+  const result: CollectedInputs = {};
+  for (const [key, value] of Object.entries(inputs)) {
+    if (typeof value === 'string' && value.startsWith('blob:')) {
+      result[key] = await uploadBlobToFal(value);
+    } else if (Array.isArray(value)) {
+      result[key] = await Promise.all(
+        value.map((v) => typeof v === 'string' && v.startsWith('blob:') ? uploadBlobToFal(v) : v)
+      );
+    } else {
+      result[key] = value;
+    }
+  }
+  return result;
+}
+
 // ── Build fal.ai request body ───────────────────────────────────────────────
 
 function buildFalInput(
@@ -538,14 +573,17 @@ export async function executeNode(
   if (!model) return { success: false, error: `Unknown model: ${modelId}` };
 
   // Collect inputs from connected nodes
-  const collectedInputs = collectInputs(nodeId, nodes, edges, model);
+  const rawInputs = collectInputs(nodeId, nodes, edges, model);
 
   // Validate required inputs
   for (const input of model.inputs) {
-    if (input.required && !(input.falParam in collectedInputs)) {
+    if (input.required && !(input.falParam in rawInputs)) {
       return { success: false, error: `Missing required input: ${input.label}` };
     }
   }
+
+  // Upload any local blob URLs to fal.ai storage
+  const collectedInputs = await ensureRemoteUrls(rawInputs);
 
   // Build request
   const falInput = buildFalInput(collectedInputs, data.settings, model);
