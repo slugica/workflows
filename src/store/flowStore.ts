@@ -39,6 +39,7 @@ interface FlowState {
   updateNodeData: (id: string, data: Partial<FlowNodeData>) => void;
   updateNodeSetting: (id: string, key: string, value: unknown) => void;
   addConnectedNode: (sourceId: string, type: FlowNodeType, templateLabel: string) => void;
+  addConnectedNodeAt: (sourceId: string, type: FlowNodeType, templateLabel: string, position: { x: number; y: number }) => void;
   deleteNode: (id: string) => void;
   runNode: (id: string) => Promise<void>;
   uploadFileToNewNode: (file: File, position: { x: number; y: number }) => void;
@@ -289,6 +290,43 @@ export const useFlowStore = create<FlowState>((set, get) => ({
     });
 
     // Re-select the new node
+    set({ selectedNodeId: newNodeId });
+  },
+
+  addConnectedNodeAt: (sourceId, type, templateLabel, position) => {
+    const sourceNode = get().nodes.find((n) => n.id === sourceId);
+    if (!sourceNode) return;
+    const sourceData = sourceNode.data as unknown as FlowNodeData;
+
+    const sourceOutput = sourceData.handles.outputs.find(
+      (h) => h.type === 'file' || h.type === 'image' || h.type === 'video' || h.type === 'text' || h.type === 'audio'
+    );
+    if (!sourceOutput) return;
+
+    get().addNode(type, templateLabel, position);
+    const newNodeId = get().selectedNodeId;
+    if (!newNodeId) return;
+
+    const newNode = get().nodes.find((n) => n.id === newNodeId);
+    if (!newNode) return;
+    const newData = newNode.data as unknown as FlowNodeData;
+
+    // Find compatible input: exact type match first, then file fallback
+    const srcType = sourceOutput.type;
+    const targetInput =
+      newData.handles.inputs.find((h) => h.type === srcType) ||
+      newData.handles.inputs.find((h) => h.type === 'file') ||
+      newData.handles.inputs.find((h) => h.type === 'image') ||
+      newData.handles.inputs.find((h) => h.type === 'video');
+    if (!targetInput) return;
+
+    get().onConnect({
+      source: sourceId,
+      target: newNodeId,
+      sourceHandle: sourceOutput.id,
+      targetHandle: targetInput.id,
+    });
+
     set({ selectedNodeId: newNodeId });
   },
 

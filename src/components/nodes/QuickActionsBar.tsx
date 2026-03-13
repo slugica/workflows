@@ -28,7 +28,7 @@ interface QuickAction {
 
 const IMAGE_ACTIONS: QuickAction[] = [
   { icon: <ArrowUpFromDot size={16} />, label: 'Upscale', type: 'image', templateLabel: 'Topaz Upscale' },
-  { icon: <Pencil size={16} />, label: 'Edit', type: 'image', templateLabel: 'FLUX Kontext Pro' },
+  { icon: <Pencil size={16} />, label: 'Edit', type: 'image', templateLabel: 'Nano Banana 2 Edit' },
   { icon: <Film size={16} />, label: 'Animate', type: 'video', templateLabel: 'Kling v3 Pro' },
   { icon: <Crop size={16} />, label: 'Crop', type: 'crop', templateLabel: 'Crop' },
   { icon: <Eraser size={16} />, label: 'Remove BG', type: 'image', templateLabel: 'Bria BG Remove' },

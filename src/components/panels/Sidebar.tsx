@@ -11,8 +11,8 @@ import { Upload, Type, ImageIcon, Video, AudioLines, Bot, Zap, Pencil, Search, W
 const QUICK_ADD: { label: string; type: FlowNodeType; templateLabel: string; icon: ReactNode; shortcut: string }[] = [
   { label: 'Upload', type: 'import', templateLabel: 'Upload', icon: <Upload size={14} />, shortcut: 'U' },
   { label: 'Prompt', type: 'prompt', templateLabel: 'Prompt', icon: <Type size={14} />, shortcut: 'P' },
-  { label: 'Image', type: 'import', templateLabel: 'Image', icon: <ImageIcon size={14} />, shortcut: 'I' },
-  { label: 'Video', type: 'import', templateLabel: 'Video', icon: <Video size={14} />, shortcut: 'V' },
+  { label: 'Image', type: 'image', templateLabel: 'Nano Banana 2 (Gemini)', icon: <ImageIcon size={14} />, shortcut: 'I' },
+  { label: 'Video', type: 'video', templateLabel: 'Kling v3 Pro', icon: <Video size={14} />, shortcut: 'V' },
 ];
 
 // ── Sidebar structure: sections → subcategories → models ─────────────────────

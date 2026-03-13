@@ -42,7 +42,8 @@ import { CombineVideoNode } from '@/components/nodes/CombineVideoNode';
 import { CombineAudioVideoNode } from '@/components/nodes/CombineAudioVideoNode';
 import { VideoIteratorNode } from '@/components/nodes/VideoIteratorNode';
 import { ExtractFrameNode } from '@/components/nodes/ExtractFrameNode';
-import { FlowNodeType, HANDLE_COLORS, resolveFileHandleColor, type FlowNodeData } from '@/lib/types';
+import { FlowNodeType, HANDLE_COLORS, resolveFileHandleColor, type FlowNodeData, type HandleDataType } from '@/lib/types';
+import { ConnectionMenu } from '@/components/ConnectionMenu';
 
 import { BaseEdge, type EdgeProps } from '@xyflow/react';
 
@@ -446,6 +447,7 @@ export function FlowCanvas() {
 
   const onPaneClick = useCallback(() => {
     selectNode(null);
+    setConnectionMenu(null);
   }, [selectNode]);
 
   const onNodeClick = useCallback((_: React.MouseEvent, node: Node) => {
@@ -536,6 +538,15 @@ export function FlowCanvas() {
   }, [handleConnect]);
 
   const connectingSourceId = useRef<string | null>(null);
+  const connectingHandleId = useRef<string | null>(null);
+
+  // Connection menu state (shown when dropping connection on empty space)
+  const [connectionMenu, setConnectionMenu] = useState<{
+    sourceId: string;
+    handleType: HandleDataType;
+    screenPosition: { x: number; y: number };
+    flowPosition: { x: number; y: number };
+  } | null>(null);
 
   const onConnectStart = useCallback((_: unknown, params: { handleId: string | null }) => {
     if (!params.handleId) return;
@@ -543,13 +554,41 @@ export function FlowCanvas() {
     if (info) {
       setConnectingHandleType(info.type);
       connectingSourceId.current = params.handleId.split('|')[0];
+      connectingHandleId.current = params.handleId;
     }
   }, [setConnectingHandleType]);
 
-  const onConnectEnd = useCallback(() => {
+  const onConnectEnd = useCallback((event: MouseEvent | TouchEvent) => {
+    const sourceId = connectingSourceId.current;
+    const handleType = connectingHandleType;
+
     setConnectingHandleType(null);
     connectingSourceId.current = null;
-  }, [setConnectingHandleType]);
+    connectingHandleId.current = null;
+
+    if (!sourceId || !handleType) return;
+
+    // Check if we dropped on a handle (connection was made) — if target is a handle element, skip menu
+    const target = (event as MouseEvent).target as HTMLElement;
+    if (target?.closest('.react-flow__handle')) return;
+
+    // Check if dropped on a node
+    if (target?.closest('.react-flow__node')) return;
+
+    // Dropped on empty space — show connection menu
+    const clientX = 'touches' in event ? event.changedTouches[0].clientX : (event as MouseEvent).clientX;
+    const clientY = 'touches' in event ? event.changedTouches[0].clientY : (event as MouseEvent).clientY;
+
+    const flowPos = reactFlowInstance.current?.screenToFlowPosition({ x: clientX, y: clientY });
+    if (!flowPos) return;
+
+    setConnectionMenu({
+      sourceId,
+      handleType: handleType as HandleDataType,
+      screenPosition: { x: clientX, y: clientY },
+      flowPosition: flowPos,
+    });
+  }, [connectingHandleType, setConnectingHandleType]);
 
   const isValidConnection: IsValidConnection = useCallback((connection) => {
     const sourceHandle = connection.sourceHandle;
@@ -592,9 +631,28 @@ export function FlowCanvas() {
     });
   }, [nodes, connectingHandleType]);
 
+  const handleConnectionMenuSelect = useCallback((type: FlowNodeType, templateLabel: string) => {
+    if (!connectionMenu) return;
+    useFlowStore.getState().addConnectedNodeAt(
+      connectionMenu.sourceId,
+      type,
+      templateLabel,
+      connectionMenu.flowPosition,
+    );
+    setConnectionMenu(null);
+  }, [connectionMenu]);
+
   return (
     <div className="flex-1 h-full relative" ref={reactFlowWrapper}>
       <SectionDrawingOverlay />
+      {connectionMenu && (
+        <ConnectionMenu
+          position={connectionMenu.screenPosition}
+          sourceHandleType={connectionMenu.handleType}
+          onSelect={handleConnectionMenuSelect}
+          onClose={() => setConnectionMenu(null)}
+        />
+      )}
       <ReactFlow
         nodes={displayNodes}
         edges={edges}
