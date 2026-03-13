@@ -207,8 +207,11 @@ export const useFlowStore = create<FlowState>((set, get) => ({
     get().pushUndo();
 
     const nodeId = generateId();
-    const existingCount = get().nodes.filter((n) => n.type === type).length;
-    const name = `${template.label} ${existingCount + 1}`;
+    const existingCount = get().nodes.filter((n) => {
+      const nd = n.data as unknown as FlowNodeData;
+      return nd.name?.startsWith(template.label);
+    }).length;
+    const name = existingCount > 0 ? `${template.label} ${existingCount + 1}` : template.label;
 
     const inputs = (template.defaultData.handles?.inputs || []).map((h) => ({
       ...h,
@@ -292,14 +295,13 @@ export const useFlowStore = create<FlowState>((set, get) => ({
   addSection: (position, size) => {
     get().pushUndo();
     const nodeId = generateId();
-    const existingCount = get().nodes.filter((n) => n.type === 'section').length;
     const w = size?.width ?? 600;
     const h = size?.height ?? 400;
     const newNode: Node = {
       id: nodeId,
       type: 'section',
       position,
-      data: { label: `Section ${existingCount + 1}` },
+      data: { label: 'Section' },
       style: { width: w, height: h },
     };
     // Parent existing nodes that fall inside the new section

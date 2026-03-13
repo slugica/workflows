@@ -582,8 +582,9 @@ export function FlowCanvas() {
       const nd = n.data as unknown as FlowNodeData;
       if (!nd.handles) return n;
       const hasCompatible = nd.handles.inputs.some((h) => {
-        if (h.type === ct || h.type === 'file' || ct === 'file') return mediaTypes.has(h.type) && mediaTypes.has(ct);
-        return h.type === ct;
+        if (h.type === ct) return true;
+        if (mediaTypes.has(ct) && mediaTypes.has(h.type)) return h.type === 'file' || ct === 'file';
+        return false;
       });
       if (hasCompatible) return n;
       return { ...n, className: `${n.className || ''} node-dimmed` };

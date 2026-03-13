@@ -535,14 +535,14 @@ export const MODEL_REGISTRY: ModelDef[] = [
   // ━━━ Video Generation ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
   {
-    id: 'fal-ai/kling-video/v3/pro/image-to-video',
+    id: 'fal-ai/kling-video/v3/pro/text-to-video',
     title: 'Kling v3 Pro',
     category: 'Video Generation',
     nodeType: 'video',
     inputs: [
-      { key: 'imageUrl', label: 'Start Frame', type: 'image', required: true, falParam: 'start_image_url' },
+      { key: 'prompt', label: 'Prompt', type: 'text', required: true, falParam: 'prompt' },
+      { key: 'imageUrl', label: 'Start Frame', type: 'image', required: false, falParam: 'start_image_url' },
       { key: 'endImageUrl', label: 'End Frame', type: 'image', required: false, falParam: 'end_image_url' },
-      { key: 'prompt', label: 'Prompt', type: 'text', required: false, falParam: 'prompt' },
     ],
     outputs: [
       { key: 'video', label: 'Video', type: 'video', falParam: 'video' },
@@ -562,14 +562,14 @@ export const MODEL_REGISTRY: ModelDef[] = [
   },
 
   {
-    id: 'fal-ai/kling-video/v3/standard/image-to-video',
+    id: 'fal-ai/kling-video/v3/standard/text-to-video',
     title: 'Kling v3 Standard',
     category: 'Video Generation',
     nodeType: 'video',
     inputs: [
-      { key: 'imageUrl', label: 'Start Frame', type: 'image', required: true, falParam: 'start_image_url' },
+      { key: 'prompt', label: 'Prompt', type: 'text', required: true, falParam: 'prompt' },
+      { key: 'imageUrl', label: 'Start Frame', type: 'image', required: false, falParam: 'start_image_url' },
       { key: 'endImageUrl', label: 'End Frame', type: 'image', required: false, falParam: 'end_image_url' },
-      { key: 'prompt', label: 'Prompt', type: 'text', required: false, falParam: 'prompt' },
     ],
     outputs: [
       { key: 'video', label: 'Video', type: 'video', falParam: 'video' },

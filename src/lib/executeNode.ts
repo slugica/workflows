@@ -701,6 +701,11 @@ export async function executeNode(
     effectiveModelId = editableModels[modelId];
   }
 
+  // Auto-switch text-to-video → image-to-video when start frame is provided
+  if (falInput.start_image_url && modelId.includes('/text-to-video')) {
+    effectiveModelId = modelId.replace('/text-to-video', '/image-to-video');
+  }
+
   // Call our API route
   try {
     const res = await fetch('/api/fal', {

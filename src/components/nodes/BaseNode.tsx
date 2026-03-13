@@ -18,11 +18,28 @@ const TYPE_ICONS: Record<string, ReactNode> = {
 };
 
 const TYPE_LABELS: Record<string, string> = {
-  import: 'Import',
+  import: 'Upload',
   prompt: 'Prompt',
-  image: 'Generate',
-  video: 'Generate',
-  audio: 'Generate',
+  image: 'Image',
+  video: 'Video',
+  audio: 'Audio',
+  crop: 'Crop',
+  blur: 'Blur',
+  resize: 'Resize',
+  filters: 'Filters',
+  levels: 'Levels',
+  aiResize: 'AI Resize',
+  preview: 'Preview',
+  export: 'Export',
+  splitImage: 'Split',
+  imageIterator: 'Iterator',
+  videoIterator: 'Iterator',
+  relight: 'Relight',
+  cameraAngles: 'Camera',
+  extractFrame: 'Extract',
+  trimVideo: 'Trim',
+  combineAudioVideo: 'Combine',
+  combineVideo: 'Combine',
 };
 
 export function BaseNode(props: NodeProps) {
@@ -172,20 +189,12 @@ export function BaseNode(props: NodeProps) {
 
       {/* Top info bar - above the card */}
       <div className="absolute bottom-full left-0 mb-1 flex w-full flex-row items-center justify-between gap-2 px-1">
-        <div className="flex items-center justify-center p-0.5">
-          <input
-            className="text-[12px] text-zinc-400 bg-transparent border-none outline-none max-w-[180px] truncate nodrag"
-            defaultValue={data.name}
-            onChange={(e) => {
-              useFlowStore.getState().updateNodeData(id, { name: e.target.value });
-            }}
-          />
-        </div>
-        {typeof data.settings.modelId === 'string' && data.settings.modelId ? (
-          <span className="text-[11px] text-white/50">
-            {data.settings.modelId.split('/').pop()}
-          </span>
-        ) : null}
+        <span className="text-[12px] text-zinc-500">
+          {TYPE_LABELS[nodeType] || nodeType}
+        </span>
+        <span className="text-[12px] text-zinc-400">
+          {data.name}
+        </span>
       </div>
 
       {/* Card */}
