@@ -304,6 +304,75 @@ function BottomBar() {
   );
 }
 
+/** Renders a bezier curve from the source handle to the connection menu position while the menu is open. */
+function PendingConnectionLine({ sourceHandleId, targetScreenPos }: { sourceHandleId: string; targetScreenPos: { x: number; y: number } }) {
+  const rfNodes = useNodes();
+  const rfEdges = useEdges();
+  const [handlePos, setHandlePos] = useState<{ x: number; y: number } | null>(null);
+
+  // Find the source handle DOM element and track its position
+  useEffect(() => {
+    const update = () => {
+      const el = document.querySelector(`[data-handleid="${CSS.escape(sourceHandleId)}"]`) as HTMLElement | null;
+      if (el) {
+        const rect = el.getBoundingClientRect();
+        setHandlePos({ x: rect.x + rect.width / 2, y: rect.y + rect.height / 2 });
+      }
+    };
+    update();
+    // Re-check on scroll/resize since viewport may move
+    window.addEventListener('resize', update);
+    const observer = new MutationObserver(update);
+    observer.observe(document.body, { subtree: true, attributes: true, childList: true });
+    return () => {
+      window.removeEventListener('resize', update);
+      observer.disconnect();
+    };
+  }, [sourceHandleId]);
+
+  // Resolve color
+  const nodeId = sourceHandleId.split('|')[0];
+  const node = rfNodes.find(n => n.id === nodeId);
+  const nodeData = node?.data as unknown as FlowNodeData | undefined;
+  const handle = nodeData?.handles.outputs.find(h => h.id === sourceHandleId);
+  let color = '#52525b';
+  if (handle) {
+    if (handle.type !== 'file') {
+      color = HANDLE_COLORS[handle.type];
+    } else if (nodeData && node) {
+      color = resolveFileHandleColor('output', nodeData, sourceHandleId, rfEdges, node.id, rfNodes);
+    } else {
+      color = HANDLE_COLORS.file;
+    }
+  }
+
+  if (!handlePos) return null;
+
+  const sx = handlePos.x;
+  const sy = handlePos.y;
+  const tx = targetScreenPos.x;
+  const ty = targetScreenPos.y;
+
+  // Bezier control points — horizontal offset based on distance
+  const dx = Math.abs(tx - sx) * 0.5;
+  const d = `M ${sx},${sy} C ${sx + dx},${sy} ${tx - dx},${ty} ${tx},${ty}`;
+
+  const gradId = 'conn-line-fade';
+
+  return (
+    <svg className="fixed inset-0 z-[9998] pointer-events-none" width="100%" height="100%">
+      <defs>
+        <linearGradient id={gradId} gradientUnits="userSpaceOnUse" x1={sx} y1={sy} x2={tx} y2={ty}>
+          <stop offset="0%" stopColor={color} stopOpacity={0.6} />
+          <stop offset="60%" stopColor={color} stopOpacity={0.3} />
+          <stop offset="100%" stopColor={color} stopOpacity={0} />
+        </linearGradient>
+      </defs>
+      <path d={d} fill="none" stroke={`url(#${gradId})`} strokeWidth={2} />
+    </svg>
+  );
+}
+
 function SectionDrawingOverlay() {
   const { screenToFlowPosition } = useReactFlow();
   const addSection = useFlowStore((s) => s.addSection);
@@ -543,6 +612,7 @@ export function FlowCanvas() {
   // Connection menu state (shown when dropping connection on empty space)
   const [connectionMenu, setConnectionMenu] = useState<{
     sourceId: string;
+    sourceHandleId: string;
     handleType: HandleDataType;
     screenPosition: { x: number; y: number };
     flowPosition: { x: number; y: number };
@@ -560,13 +630,14 @@ export function FlowCanvas() {
 
   const onConnectEnd = useCallback((event: MouseEvent | TouchEvent) => {
     const sourceId = connectingSourceId.current;
+    const sourceHandle = connectingHandleId.current;
     const handleType = connectingHandleType;
 
     setConnectingHandleType(null);
     connectingSourceId.current = null;
     connectingHandleId.current = null;
 
-    if (!sourceId || !handleType) return;
+    if (!sourceId || !handleType || !sourceHandle) return;
 
     // Check if we dropped on a handle (connection was made) — if target is a handle element, skip menu
     const target = (event as MouseEvent).target as HTMLElement;
@@ -582,10 +653,18 @@ export function FlowCanvas() {
     const flowPos = reactFlowInstance.current?.screenToFlowPosition({ x: clientX, y: clientY });
     if (!flowPos) return;
 
+    // Clamp menu position to fit within viewport (menu is 280×420 max)
+    const menuW = 280;
+    const menuH = 420;
+    const pad = 10;
+    const clampedX = Math.min(clientX, window.innerWidth - menuW - pad);
+    const clampedY = Math.max(pad, Math.min(clientY, window.innerHeight - menuH - pad));
+
     setConnectionMenu({
       sourceId,
+      sourceHandleId: sourceHandle,
       handleType: handleType as HandleDataType,
-      screenPosition: { x: clientX, y: clientY },
+      screenPosition: { x: clampedX, y: clampedY },
       flowPosition: flowPos,
     });
   }, [connectingHandleType, setConnectingHandleType]);
@@ -646,12 +725,18 @@ export function FlowCanvas() {
     <div className="flex-1 h-full relative" ref={reactFlowWrapper}>
       <SectionDrawingOverlay />
       {connectionMenu && (
-        <ConnectionMenu
-          position={connectionMenu.screenPosition}
-          sourceHandleType={connectionMenu.handleType}
-          onSelect={handleConnectionMenuSelect}
-          onClose={() => setConnectionMenu(null)}
-        />
+        <>
+          <PendingConnectionLine
+            sourceHandleId={connectionMenu.sourceHandleId}
+            targetScreenPos={connectionMenu.screenPosition}
+          />
+          <ConnectionMenu
+            position={connectionMenu.screenPosition}
+            sourceHandleType={connectionMenu.handleType}
+            onSelect={handleConnectionMenuSelect}
+            onClose={() => setConnectionMenu(null)}
+          />
+        </>
       )}
       <ReactFlow
         nodes={displayNodes}
