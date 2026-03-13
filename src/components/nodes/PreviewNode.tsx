@@ -309,6 +309,7 @@ export function PreviewNode(props: NodeProps) {
                 <div className="relative w-full h-full">
                   {/* Hidden video element */}
                   <video
+                    key={inputUrl}
                     ref={videoRef}
                     src={inputUrl}
                     className="hidden"

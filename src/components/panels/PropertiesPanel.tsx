@@ -914,7 +914,7 @@ export function PropertiesPanel() {
           <input
             type="text"
             className="w-full bg-[#171717] text-zinc-200 text-xs rounded-lg px-3 py-2 border border-[#212121] focus:border-[#333] focus:outline-none"
-            value={nodeData.name}
+            value={nodeData.name || ''}
             onChange={(e) => updateNodeData(selectedNode.id, { name: e.target.value })}
           />
         </div>

@@ -39,6 +39,8 @@ import { CameraAnglesNode } from '@/components/nodes/CameraAnglesNode';
 import { SectionNode } from '@/components/nodes/SectionNode';
 import { TrimVideoNode } from '@/components/nodes/TrimVideoNode';
 import { CombineVideoNode } from '@/components/nodes/CombineVideoNode';
+import { CombineAudioVideoNode } from '@/components/nodes/CombineAudioVideoNode';
+import { VideoIteratorNode } from '@/components/nodes/VideoIteratorNode';
 import { FlowNodeType, HANDLE_COLORS, resolveFileHandleColor, type FlowNodeData } from '@/lib/types';
 
 import { BaseEdge, type EdgeProps } from '@xyflow/react';
@@ -96,9 +98,9 @@ const nodeTypes: NodeTypes = {
   section: SectionNode,
   extractFrame: BaseNode,
   trimVideo: TrimVideoNode,
-  combineAudioVideo: BaseNode,
+  combineAudioVideo: CombineAudioVideoNode,
   combineVideo: CombineVideoNode,
-  videoIterator: BaseNode,
+  videoIterator: VideoIteratorNode,
 };
 
 function parseHandleInfo(handleId: string): { direction: string; type: string; key: string } | null {
@@ -183,7 +185,7 @@ function BottomBar() {
         ref={fileInputRef}
         type="file"
         className="hidden"
-        accept="image/*,video/*"
+        accept="image/*,video/*,audio/*"
         onChange={handleFileChange}
       />
       {/* Main tool group */}
@@ -537,7 +539,7 @@ export function FlowCanvas() {
     const sourceInfo = parseHandleInfo(sourceHandle);
     const targetInfo = parseHandleInfo(targetHandle);
     if (!sourceInfo || !targetInfo) return false;
-    const fileTypes = new Set(['file', 'image', 'video']);
+    const fileTypes = new Set(['file', 'image', 'video', 'audio']);
     const typesMatch = sourceInfo.type === targetInfo.type
       || (fileTypes.has(sourceInfo.type) && fileTypes.has(targetInfo.type));
     if (!typesMatch) return false;

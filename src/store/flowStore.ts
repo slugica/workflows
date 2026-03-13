@@ -80,6 +80,7 @@ export const useFlowStore = create<FlowState>((set, get) => ({
       const connectedHandleIds = new Set(newEdges.map((e) => e.targetHandle));
       const updatedNodes = get().nodes.map((n) => {
         const data = n.data as unknown as FlowNodeData;
+        if (!data.handles?.inputs) return n;
         const dynamicBases = new Set(
           data.handles.inputs.filter((h: HandleDef) => h.dynamic && h.dynamicBase).map((h: HandleDef) => h.dynamicBase)
         );
@@ -127,7 +128,7 @@ export const useFlowStore = create<FlowState>((set, get) => ({
     const sourceType = parseHandleType(sourceHandle);
     const targetType = parseHandleType(targetHandle);
     if (!sourceType || !targetType) return;
-    const fileTypes = new Set(['file', 'image', 'video']);
+    const fileTypes = new Set(['file', 'image', 'video', 'audio']);
     const typesMatch = sourceType === targetType || (fileTypes.has(sourceType) && fileTypes.has(targetType));
     if (!typesMatch) return;
 

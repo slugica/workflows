@@ -247,7 +247,7 @@ export function BaseNode(props: NodeProps) {
             {data.settings.fileUrl ? (
               <>
                 {/* Hidden image to get natural dimensions during upload */}
-                {data.settings.uploading && !(data.settings.fileType as string)?.startsWith('video/') && (
+                {data.settings.uploading && (data.settings.fileType as string)?.startsWith('image/') && (
                   <img
                     src={data.settings.fileUrl as string}
                     alt=""
@@ -267,7 +267,18 @@ export function BaseNode(props: NodeProps) {
                     className="w-full h-full object-cover nodrag"
                     controls
                     muted
+                    preload="metadata"
                   />
+                ) : (data.settings.fileType as string)?.startsWith('audio/') ? (
+                  <div className="flex flex-col items-center justify-center gap-3 p-6" style={{ aspectRatio: '1' }}>
+                    <AudioLines size={32} className="text-zinc-500" />
+                    <span className="text-zinc-400 text-xs truncate max-w-full">{data.settings.fileName as string}</span>
+                    <audio
+                      src={data.settings.fileUrl as string}
+                      className="w-full nodrag"
+                      controls
+                    />
+                  </div>
                 ) : (
                   <img
                     src={data.settings.fileUrl as string}
