@@ -9,6 +9,7 @@ import {
   SelectionMode,
   useViewport,
   useReactFlow,
+  useUpdateNodeInternals,
   useEdges,
   useNodes,
   Panel,
@@ -37,6 +38,7 @@ import { RelightNode } from '@/components/nodes/RelightNode';
 import { CameraAnglesNode } from '@/components/nodes/CameraAnglesNode';
 import { SectionNode } from '@/components/nodes/SectionNode';
 import { TrimVideoNode } from '@/components/nodes/TrimVideoNode';
+import { CombineVideoNode } from '@/components/nodes/CombineVideoNode';
 import { FlowNodeType, HANDLE_COLORS, resolveFileHandleColor, type FlowNodeData } from '@/lib/types';
 
 import { BaseEdge, type EdgeProps } from '@xyflow/react';
@@ -95,7 +97,7 @@ const nodeTypes: NodeTypes = {
   extractFrame: BaseNode,
   trimVideo: TrimVideoNode,
   combineAudioVideo: BaseNode,
-  combineVideo: BaseNode,
+  combineVideo: CombineVideoNode,
   videoIterator: BaseNode,
 };
 
@@ -245,7 +247,7 @@ function BottomBar() {
           <div className="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl py-1 min-w-[160px] shadow-xl">
             {[
               { label: 'Zoom in', action: () => zoomTo(Math.min(2, zoom + 0.25), { duration: 200 }), shortcut: '⌘+' },
-              { label: 'Zoom out', action: () => zoomTo(Math.max(0.1, zoom - 0.25), { duration: 200 }), shortcut: '⌘−' },
+              { label: 'Zoom out', action: () => zoomTo(Math.max(0.15, zoom - 0.25), { duration: 200 }), shortcut: '⌘−' },
               { label: 'Zoom to fit', action: () => fitView({ duration: 200 }), shortcut: '⌘1' },
               null,
               { label: 'Zoom to 50%', action: () => zoomTo(0.5, { duration: 200 }) },
@@ -399,6 +401,17 @@ export function FlowCanvas() {
     selectNode,
   } = useFlowStore();
   const drawingMode = useFlowStore((s) => s.drawingMode);
+  const updateNodeInternals = useUpdateNodeInternals();
+
+  // Wrap onConnect to update node internals after dynamic handle spawning
+  const handleConnect = useCallback((connection: Connection) => {
+    onConnect(connection);
+    // After connecting, update target node internals so React Flow recalculates handle positions
+    if (connection.target) {
+      requestAnimationFrame(() => updateNodeInternals(connection.target));
+    }
+  }, [onConnect, updateNodeInternals]);
+
   const reactFlowWrapper = useRef<HTMLDivElement>(null);
   const reactFlowInstance = useRef<{ screenToFlowPosition: (pos: { x: number; y: number }) => { x: number; y: number } } | null>(null);
 
@@ -514,8 +527,8 @@ export function FlowCanvas() {
     const store = useFlowStore.getState();
     // Remove old edge, add new connection
     store.onEdgesChange([{ id: oldEdge.id, type: 'remove' }]);
-    store.onConnect(newConnection);
-  }, []);
+    handleConnect(newConnection);
+  }, [handleConnect]);
 
   const isValidConnection: IsValidConnection = useCallback((connection) => {
     const sourceHandle = connection.sourceHandle;
@@ -529,6 +542,12 @@ export function FlowCanvas() {
       || (fileTypes.has(sourceInfo.type) && fileTypes.has(targetInfo.type));
     if (!typesMatch) return false;
     if (connection.source === connection.target) return false;
+    // Prevent same source node from connecting to multiple inputs on the same target
+    const currentEdges = useFlowStore.getState().edges;
+    const alreadyConnected = currentEdges.some(
+      (e) => e.source === connection.source && e.target === connection.target
+    );
+    if (alreadyConnected) return false;
     return true;
   }, []);
 
@@ -540,7 +559,7 @@ export function FlowCanvas() {
         edges={edges}
         onNodesChange={onNodesChange}
         onEdgesChange={onEdgesChange}
-        onConnect={onConnect}
+        onConnect={handleConnect}
         isValidConnection={isValidConnection}
         onDragOver={onDragOver}
         onDrop={onDrop}
@@ -560,6 +579,7 @@ export function FlowCanvas() {
         selectionMode={SelectionMode.Partial}
         deleteKeyCode={['Backspace', 'Delete']}
         fitView
+        minZoom={0.15}
         fitViewOptions={{ maxZoom: 1 }}
         colorMode="dark"
         edgeTypes={edgeTypes}

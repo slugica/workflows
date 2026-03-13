@@ -252,7 +252,7 @@ function parseFalResult(result: Record<string, unknown>, model: ModelDef): FlowN
 
 // ── Rendi (FFmpeg) execution for utility nodes ─────────────────────────────
 
-async function executeRendi(body: {
+export async function executeRendi(body: {
   input_files: Record<string, string>;
   output_files: Record<string, string>;
   ffmpeg_command: string;
@@ -394,6 +394,92 @@ async function executeTrimNode(nodeId: string, nodes: Node[], edges: Edge[]): Pr
     success: true,
     results: [{ video: { content: rendiResult.url!, format: 'video' } }],
   };
+}
+
+// ── Combine Video node: concatenate multiple videos with optional transitions ─
+
+async function executeCombineVideoNode(nodeId: string, nodes: Node[], edges: Edge[]): Promise<ExecutionResult> {
+  const node = nodes.find((n) => n.id === nodeId);
+  if (!node) return { success: false, error: 'Node not found' };
+  const data = getNodeData(node);
+
+  // Collect all incoming video edges sorted by handle key
+  const incomingEdges = edges
+    .filter(e => e.target === nodeId && e.targetHandle?.includes('input:video'))
+    .sort((a, b) => {
+      const keyA = parseInt((a.targetHandle?.split(':').pop() || '').replace(/\D/g, '')) || 0;
+      const keyB = parseInt((b.targetHandle?.split(':').pop() || '').replace(/\D/g, '')) || 0;
+      return keyA - keyB;
+    });
+
+  if (incomingEdges.length < 2) {
+    return { success: false, error: 'Connect at least 2 videos' };
+  }
+
+  // Resolve video URLs from source nodes
+  const videoUrls: string[] = [];
+  for (const edge of incomingEdges) {
+    const srcNode = nodes.find(n => n.id === edge.source);
+    if (!srcNode) continue;
+    const srcData = getNodeData(srcNode);
+
+    let url: string | null = null;
+    if (srcData.settings.fileUrl) {
+      url = srcData.settings.fileUrl as string;
+    } else if (srcData.results?.length) {
+      const r = srcData.results[srcData.selectedResultIndex || 0];
+      if (r) {
+        const handleKey = edge.sourceHandle?.split(':').pop();
+        if (handleKey && r[handleKey]?.content) {
+          url = r[handleKey].content;
+        } else {
+          const entry = Object.values(r)[0];
+          if (entry?.content) url = entry.content;
+        }
+      }
+    }
+    if (url) videoUrls.push(await ensureRemoteUrl(url));
+  }
+
+  if (videoUrls.length < 2) {
+    return { success: false, error: 'Could not resolve at least 2 video URLs' };
+  }
+
+  const n = videoUrls.length;
+  const transition = (data.settings.transition as string) || 'none';
+
+  // Build input_files
+  const input_files: Record<string, string> = {};
+  for (let i = 0; i < n; i++) input_files[`in_${i}`] = videoUrls[i];
+
+  const inputArgs = Array.from({ length: n }, (_, i) => `-i {{in_${i}}}`).join(' ');
+
+  // For simple concat (no transition), audio fallback pattern
+  if (transition === 'none') {
+    const streams = Array.from({ length: n }, (_, i) => `[${i}:v][${i}:a]`).join('');
+    let result = await executeRendi({
+      input_files,
+      output_files: { out_video: 'combined.mp4' },
+      ffmpeg_command: `${inputArgs} -filter_complex "${streams}concat=n=${n}:v=1:a=1[outv][outa]" -map "[outv]" -map "[outa]" {{out_video}}`,
+    });
+    if (!result.success) {
+      const vStreams = Array.from({ length: n }, (_, i) => `[${i}:v]`).join('');
+      result = await executeRendi({
+        input_files,
+        output_files: { out_video: 'combined.mp4' },
+        ffmpeg_command: `${inputArgs} -filter_complex "${vStreams}concat=n=${n}:v=1:a=0[outv]" -map "[outv]" -an {{out_video}}`,
+      });
+    }
+    if (!result.success) return { success: false, error: result.error };
+    return { success: true, results: [{ file: { content: result.url!, format: 'video' } }] };
+  }
+
+  // Xfade transitions — we don't know durations server-side, so use ffprobe-based approach
+  // Build filter assuming Rendi can chain xfade. Offsets are unknown without probing.
+  // Use a simpler concat-with-xfade by passing the command and letting Rendi handle it.
+  // Since we can't probe durations here, we pass a reasonable default offset pattern.
+  // The component-side execution (Run button) handles this better with client-side duration probing.
+  return { success: false, error: 'Transition effects require using the Run button on the node (duration probing needed)' };
 }
 
 // ── Export node: walk chain, collect operations, execute via Rendi ───────────
@@ -564,6 +650,7 @@ export async function executeNode(
   // Route utility nodes to Rendi (FFmpeg)
   if (node.type === 'crop') return executeCropNode(nodeId, nodes, edges);
   if (node.type === 'trimVideo') return executeTrimNode(nodeId, nodes, edges);
+  if (node.type === 'combineVideo') return executeCombineVideoNode(nodeId, nodes, edges);
   if (node.type === 'export') return executeExportNode(nodeId, nodes, edges);
 
   const modelId = data.settings.modelId as string;

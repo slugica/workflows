@@ -6,7 +6,8 @@ import { FlowNodeData, HANDLE_COLORS, resolveFileHandleColor } from '@/lib/types
 import { resolveInputImageUrl } from '@/lib/resolveInput';
 import { ensureRemoteUrl } from '@/lib/executeNode';
 import { useFlowStore } from '@/store/flowStore';
-import { Scaling, Play, Loader, ChevronLeft, ChevronRight, Trash2 } from 'lucide-react';
+import { Scaling, Play, Loader } from 'lucide-react';
+import { ResultNavOverlay } from '@/components/nodes/ResultNavOverlay';
 
 type AspectRatio = '1:1' | '3:4' | '4:3' | '2:3' | '3:2' | '4:5' | '5:4' | '9:16' | '16:9' | '21:9';
 
@@ -277,7 +278,7 @@ export function AiResizeNode(props: NodeProps) {
         <div className="self-stretch">
           {/* Result view */}
           {isPreview && inputImageUrl ? (
-            <div className="relative">
+            <div className="relative group/preview">
               {previewLayout ? (
                 <div
                   className="relative rounded-2xl overflow-hidden mx-auto"
@@ -304,84 +305,12 @@ export function AiResizeNode(props: NodeProps) {
               ) : (
                 <div className={`rounded-2xl ${isRunning ? 'shimmer' : 'bg-[#212121]'}`} style={{ aspectRatio: aspectRatio.replace(':', '/') }} />
               )}
-              {data.results.length > 1 && (
-                <div className="absolute top-2 left-2 right-2 flex items-center justify-between">
-                  <div className="flex items-center gap-1">
-                    <button
-                      className="w-7 h-7 rounded-full bg-black/60 hover:bg-black/80 flex items-center justify-center nodrag transition-colors"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        const prev = selectedIdx - 1;
-                        if (prev >= 0) useFlowStore.getState().updateNodeData(id, { selectedResultIndex: prev });
-                      }}
-                    >
-                      <ChevronLeft size={14} className="text-white" />
-                    </button>
-                    <span className="text-xs text-white font-medium px-1">
-                      {selectedIdx + 1}/{data.results.length}
-                    </span>
-                    <button
-                      className="w-7 h-7 rounded-full bg-black/60 hover:bg-black/80 flex items-center justify-center nodrag transition-colors"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        const next = selectedIdx + 1;
-                        if (next < data.results.length) useFlowStore.getState().updateNodeData(id, { selectedResultIndex: next });
-                      }}
-                    >
-                      <ChevronRight size={14} className="text-white" />
-                    </button>
-                  </div>
-                </div>
-              )}
+              <ResultNavOverlay nodeId={id} results={data.results} selectedResultIndex={data.selectedResultIndex || 0} />
             </div>
           ) : resultUrl ? (
-            <div className="relative bg-[#212121] rounded-2xl overflow-hidden">
+            <div className="relative group/preview bg-[#212121] rounded-2xl overflow-hidden">
               <img src={resultUrl} alt="AI Resize result" className="w-full" />
-              {data.results.length > 1 && (
-                <div className="absolute top-2 left-2 right-2 flex items-center justify-between">
-                  <div className="flex items-center gap-1">
-                    <button
-                      className="w-7 h-7 rounded-full bg-black/60 hover:bg-black/80 flex items-center justify-center nodrag transition-colors"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        const prev = (selectedIdx) - 1;
-                        if (prev >= 0) useFlowStore.getState().updateNodeData(id, { selectedResultIndex: prev });
-                      }}
-                    >
-                      <ChevronLeft size={14} className="text-white" />
-                    </button>
-                    <span className="text-xs text-white font-medium px-1">
-                      {(selectedIdx) + 1}/{data.results.length}
-                    </span>
-                    <button
-                      className="w-7 h-7 rounded-full bg-black/60 hover:bg-black/80 flex items-center justify-center nodrag transition-colors"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        const next = (selectedIdx) + 1;
-                        if (next < data.results.length) useFlowStore.getState().updateNodeData(id, { selectedResultIndex: next });
-                      }}
-                    >
-                      <ChevronRight size={14} className="text-white" />
-                    </button>
-                  </div>
-                  <button
-                    className="w-7 h-7 rounded-full bg-black/60 hover:bg-red-900/80 flex items-center justify-center nodrag transition-colors"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      const idx = selectedIdx;
-                      const newResults = data.results.filter((_, i) => i !== idx);
-                      const newIdx = Math.min(idx, newResults.length - 1);
-                      useFlowStore.getState().updateNodeData(id, {
-                        results: newResults,
-                        selectedResultIndex: Math.max(0, newIdx),
-                        ...(newResults.length === 0 ? { status: 'idle' as const } : {}),
-                      });
-                    }}
-                  >
-                    <Trash2 size={12} className="text-white" />
-                  </button>
-                </div>
-              )}
+              <ResultNavOverlay nodeId={id} results={data.results} selectedResultIndex={data.selectedResultIndex || 0} />
             </div>
           ) : isRunning ? (
             <div

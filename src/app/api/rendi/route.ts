@@ -93,8 +93,9 @@ export async function POST(req: NextRequest) {
       }
 
       if (status === 'FAILED') {
+        console.error('[RENDI] Failed:', JSON.stringify(pollData, null, 2));
         return NextResponse.json(
-          { error: `FFmpeg command failed: ${pollData.error || 'Unknown error'}` },
+          { error: `FFmpeg command failed: ${pollData.error_message || pollData.error || 'Unknown error'}` },
           { status: 500 }
         );
       }
