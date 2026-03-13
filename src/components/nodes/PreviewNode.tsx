@@ -5,7 +5,7 @@ import { Handle, Position, useEdges, useNodes, type NodeProps } from '@xyflow/re
 import { FlowNodeData, HANDLE_COLORS, resolveFileHandleColor } from '@/lib/types';
 import { resolveInput } from '@/lib/resolveInput';
 import { useFlowStore } from '@/store/flowStore';
-import { ScanLine, Play, Pause } from 'lucide-react';
+import { ScanLine, Play, Pause, Volume2, VolumeOff } from 'lucide-react';
 
 export function PreviewNode(props: NodeProps) {
   const { id, selected } = props;
@@ -89,6 +89,8 @@ export function PreviewNode(props: NodeProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const rafRef = useRef<number>(0);
   const [isPlaying, setIsPlaying] = useState(false);
+  const [isMuted, setIsMuted] = useState(true);
+  const [videoLoading, setVideoLoading] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
 
@@ -313,16 +315,18 @@ export function PreviewNode(props: NodeProps) {
                     ref={videoRef}
                     src={inputUrl}
                     className="hidden"
-                    muted
+                    muted={isMuted}
                     playsInline
                     preload="auto"
+                    onLoadStart={() => setVideoLoading(true)}
                     onLoadedMetadata={(e) => {
                       const v = e.currentTarget;
                       setImgNatural({ w: v.videoWidth, h: v.videoHeight });
                       setDuration(v.duration);
-                      // Start at first segment if trimmed, otherwise at beginning
                       v.currentTime = trimSegments?.[0]?.start ?? 0.001;
+                      setVideoLoading(false);
                     }}
+                    onError={() => setVideoLoading(false)}
                     onEnded={() => setIsPlaying(false)}
                   />
                   {/* Canvas renders cropped/full video frames */}
@@ -335,6 +339,9 @@ export function PreviewNode(props: NodeProps) {
                         : imgNatural ? `${imgNatural.w}/${imgNatural.h}` : undefined,
                     }}
                   />
+                  {videoLoading && (
+                    <div className="absolute inset-0 shimmer" />
+                  )}
                   {/* Video controls overlay */}
                   <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/70 to-transparent p-2 pt-6 flex flex-col gap-1 nodrag">
                     <input
@@ -356,6 +363,18 @@ export function PreviewNode(props: NodeProps) {
                       <span className="text-[10px] text-zinc-300">
                         {formatTime(currentTime)} / {formatTime(trimSegments ? trimSegments.reduce((acc, s) => acc + (s.end - s.start), 0) : duration)}
                       </span>
+                      <div className="flex-1" />
+                      <button
+                        className="text-white hover:text-zinc-300 transition-colors"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          const next = !isMuted;
+                          setIsMuted(next);
+                          if (videoRef.current) videoRef.current.muted = next;
+                        }}
+                      >
+                        {isMuted ? <VolumeOff size={14} /> : <Volume2 size={14} />}
+                      </button>
                     </div>
                   </div>
                 </div>

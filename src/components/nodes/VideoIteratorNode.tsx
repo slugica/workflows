@@ -120,22 +120,33 @@ export function VideoIteratorNode(props: NodeProps) {
   const effectiveKey = allVideos.find(v => v.key === selectedKey) ? selectedKey : (allVideos[0]?.key ?? null);
   const selectedVideo = allVideos.find(v => v.key === effectiveKey);
 
-  // Pass selected video to output (results) so downstream nodes can resolve it
-  useEffect(() => {
-    if (selectedVideo?.url && !selectedVideo.uploading) {
+  // Push selected video to store immediately
+  const pushOutput = useCallback((url: string | undefined, uploading: boolean | undefined, count: number) => {
+    if (url && !uploading) {
       useFlowStore.getState().updateNodeData(id, {
         status: 'done',
-        results: [{ output: { content: selectedVideo.url, format: 'video' } }],
+        results: [{ output: { content: url, format: 'video' } }],
         selectedResultIndex: 0,
       });
-    } else if (allVideos.length === 0) {
+    } else if (count === 0) {
       useFlowStore.getState().updateNodeData(id, {
         status: 'idle',
         results: [],
         selectedResultIndex: 0,
       });
     }
-  }, [id, selectedVideo?.url, selectedVideo?.uploading, allVideos.length]);
+  }, [id]);
+
+  // Auto-sync when videos list changes (new connections, uploads finish)
+  useEffect(() => {
+    pushOutput(selectedVideo?.url, selectedVideo?.uploading, allVideos.length);
+  }, [selectedVideo?.url, selectedVideo?.uploading, allVideos.length, pushOutput]);
+
+  const selectVideo = useCallback((key: string) => {
+    setSelectedKey(key);
+    const vid = allVideos.find(v => v.key === key);
+    if (vid) pushOutput(vid.url, vid.uploading, allVideos.length);
+  }, [allVideos, pushOutput]);
 
   const minCardHeight = inputCount > 1
     ? HEADER_OFFSET + handlesHeight(inputCount) + CARD_PADDING_BOTTOM
@@ -305,7 +316,7 @@ export function VideoIteratorNode(props: NodeProps) {
                     className={`relative bg-[#212121] rounded-xl overflow-hidden cursor-pointer transition-all nodrag ${
                       isSelected ? 'ring-2 ring-white/60' : 'ring-1 ring-transparent hover:ring-white/20'
                     }`}
-                    onClick={(e) => { e.stopPropagation(); setSelectedKey(vid.key); }}
+                    onClick={(e) => { e.stopPropagation(); selectVideo(vid.key); }}
                   >
                     {vid.uploading ? (
                       <div className="shimmer w-full aspect-video" />
