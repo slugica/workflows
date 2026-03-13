@@ -7,7 +7,7 @@ import { FlowNodeData, HANDLE_COLORS, resolveFileHandleColor } from '@/lib/types
 import { useFlowStore } from '@/store/flowStore';
 import { Upload, Type, ImageIcon, Video, AudioLines, Play, Loader } from 'lucide-react';
 import { ResultNavOverlay } from '@/components/nodes/ResultNavOverlay';
-import { QuickActionsBar } from '@/components/nodes/QuickActionsBar';
+import { QuickActionsBar, type QuickActionMode } from '@/components/nodes/QuickActionsBar';
 
 const TYPE_ICONS: Record<string, ReactNode> = {
   import: <Upload size={18} />,
@@ -118,11 +118,20 @@ export function BaseNode(props: NodeProps) {
 
   const isPrompt = nodeType === 'prompt';
 
-  // Show quick actions on any node with image/file output (not prompt)
-  const showQuickActions = useMemo(() => {
-    if (isPrompt) return false;
-    return data.handles.outputs.some((h) => h.type === 'file' || h.type === 'image');
-  }, [isPrompt, data.handles.outputs]);
+  // Determine quick actions mode based on output type
+  const quickActionMode = useMemo((): QuickActionMode | null => {
+    if (isPrompt) return null;
+    const outputs = data.handles.outputs;
+    if (outputs.some((h) => h.type === 'video')) return 'video';
+    if (outputs.some((h) => h.type === 'image')) return 'image';
+    if (outputs.some((h) => h.type === 'file')) {
+      // For file outputs (import nodes), detect from fileType setting
+      const ft = data.settings.fileType as string | undefined;
+      if (ft?.startsWith('video/')) return 'video';
+      return 'image';
+    }
+    return null;
+  }, [isPrompt, data.handles.outputs, data.settings.fileType]);
 
   const imageUrl = useMemo(() => {
     if (nodeType === 'import' && (data.settings.fileType as string)?.startsWith('image/') && data.settings.fileUrl)
@@ -160,11 +169,12 @@ export function BaseNode(props: NodeProps) {
       )}
 
       {/* Quick actions bar */}
-      {showQuickActions && (
+      {quickActionMode && (
         <QuickActionsBar
           nodeId={id}
           selected={!!selected}
           hovered={isHovered}
+          mode={quickActionMode}
           fileUrl={imageUrl}
           onFullscreen={imageUrl ? () => setShowFullscreen(true) : undefined}
         />

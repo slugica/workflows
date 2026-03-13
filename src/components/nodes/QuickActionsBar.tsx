@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useState, useRef, useEffect } from 'react';
+import { useCallback, useState, useRef, useEffect, useMemo } from 'react';
 import { useViewport } from '@xyflow/react';
 import { useFlowStore } from '@/store/flowStore';
 import {
@@ -12,6 +12,10 @@ import {
   Scaling,
   Download,
   Maximize2,
+  Clapperboard,
+  FastForward,
+  ScanLine,
+  Eye,
 } from 'lucide-react';
 import type { FlowNodeType } from '@/lib/types';
 
@@ -31,23 +35,33 @@ const IMAGE_ACTIONS: QuickAction[] = [
   { icon: <Scaling size={16} />, label: 'AI Resize', type: 'aiResize', templateLabel: 'AI Resize' },
 ];
 
+const VIDEO_ACTIONS: QuickAction[] = [
+  { icon: <ArrowUpFromDot size={16} />, label: 'Upscale Video', type: 'video', templateLabel: 'Topaz Video Upscale' },
+  { icon: <Clapperboard size={16} />, label: 'Edit Video', type: 'video', templateLabel: 'Kling Omni Edit (V2V)' },
+  { icon: <FastForward size={16} />, label: 'Extend Video', type: 'video', templateLabel: 'Pixverse Extend' },
+  { icon: <ScanLine size={16} />, label: 'Extract Frame', type: 'extractFrame', templateLabel: 'Extract Video Frame' },
+];
+
+export type QuickActionMode = 'image' | 'video';
+
 interface QuickActionsBarProps {
   nodeId: string;
   selected: boolean;
   hovered: boolean;
+  mode: QuickActionMode;
   fileUrl?: string;
   onFullscreen?: () => void;
 }
 
-export function QuickActionsBar({ nodeId, selected, hovered, fileUrl, onFullscreen }: QuickActionsBarProps) {
+export function QuickActionsBar({ nodeId, selected, hovered, mode, fileUrl, onFullscreen }: QuickActionsBarProps) {
   const { zoom } = useViewport();
   const addConnectedNode = useFlowStore((s) => s.addConnectedNode);
   const [delayedVisible, setDelayedVisible] = useState(false);
   const timerRef = useRef<ReturnType<typeof setTimeout>>(undefined);
-
   const showTimerRef = useRef<ReturnType<typeof setTimeout>>(undefined);
 
-  // Show after 1s hover delay, hide after 1s unhover delay
+  const actions = useMemo(() => mode === 'video' ? VIDEO_ACTIONS : IMAGE_ACTIONS, [mode]);
+
   useEffect(() => {
     if (hovered) {
       clearTimeout(timerRef.current);
@@ -90,7 +104,7 @@ export function QuickActionsBar({ nodeId, selected, hovered, fileUrl, onFullscre
         }
       }}
     >
-      {IMAGE_ACTIONS.map((action) => (
+      {actions.map((action) => (
         <button
           key={action.templateLabel}
           className="w-8 h-8 flex items-center justify-center rounded-full text-zinc-400 hover:text-white hover:bg-[#333] transition-colors"
@@ -100,6 +114,14 @@ export function QuickActionsBar({ nodeId, selected, hovered, fileUrl, onFullscre
           {action.icon}
         </button>
       ))}
+      <div className="w-px h-5 bg-[#333] mx-0.5" />
+      <button
+        className="w-8 h-8 flex items-center justify-center rounded-full text-zinc-400 hover:text-white hover:bg-[#333] transition-colors"
+        title="Preview"
+        onClick={() => addConnectedNode(nodeId, 'preview', 'Preview')}
+      >
+        <Eye size={16} />
+      </button>
       {(fileUrl || onFullscreen) && <div className="w-px h-5 bg-[#333] mx-0.5" />}
       {fileUrl && (
         <button

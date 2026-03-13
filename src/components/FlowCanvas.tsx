@@ -41,6 +41,7 @@ import { TrimVideoNode } from '@/components/nodes/TrimVideoNode';
 import { CombineVideoNode } from '@/components/nodes/CombineVideoNode';
 import { CombineAudioVideoNode } from '@/components/nodes/CombineAudioVideoNode';
 import { VideoIteratorNode } from '@/components/nodes/VideoIteratorNode';
+import { ExtractFrameNode } from '@/components/nodes/ExtractFrameNode';
 import { FlowNodeType, HANDLE_COLORS, resolveFileHandleColor, type FlowNodeData } from '@/lib/types';
 
 import { BaseEdge, type EdgeProps } from '@xyflow/react';
@@ -96,7 +97,7 @@ const nodeTypes: NodeTypes = {
   relight: RelightNode,
   cameraAngles: CameraAnglesNode,
   section: SectionNode,
-  extractFrame: BaseNode,
+  extractFrame: ExtractFrameNode,
   trimVideo: TrimVideoNode,
   combineAudioVideo: CombineAudioVideoNode,
   combineVideo: CombineVideoNode,

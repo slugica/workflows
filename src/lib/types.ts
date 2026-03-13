@@ -334,7 +334,7 @@ const STATIC_TEMPLATES: NodeTemplate[] = [
       behavior: 'static',
       handles: {
         inputs: [{ id: '', key: 'file', label: 'Video', type: 'video', required: true }],
-        outputs: [{ id: '', key: 'frame', label: 'Frame', type: 'image' }],
+        outputs: [{ id: '', key: 'frame', label: 'Image', type: 'image' }],
       },
       settings: { timestamp: 0 },
     },
