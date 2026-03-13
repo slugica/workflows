@@ -6,6 +6,7 @@ import { FlowNodeData, HANDLE_COLORS, resolveFileHandleColor } from '@/lib/types
 import { resolveInput } from '@/lib/resolveInput';
 import { useFlowStore } from '@/store/flowStore';
 import { Scaling, Link, Unlink } from 'lucide-react';
+import { VideoPreviewPlayer } from './VideoPreviewPlayer';
 
 export function ResizeNode(props: NodeProps) {
   const { id, selected } = props;
@@ -73,6 +74,15 @@ export function ResizeNode(props: NodeProps) {
       setTargetW(Math.round(h * (imgNatural.w / imgNatural.h)));
     }
   };
+
+  // Persist FFmpeg op for export chain
+  useEffect(() => {
+    if (targetW > 0 && targetH > 0 && imgNatural && (targetW !== imgNatural.w || targetH !== imgNatural.h)) {
+      useFlowStore.getState().updateNodeSetting(id, 'ffmpegOp', { vFilters: [`scale=${targetW}:${targetH}`] });
+    } else {
+      useFlowStore.getState().updateNodeSetting(id, 'ffmpegOp', null);
+    }
+  }, [id, targetW, targetH, imgNatural]);
 
   // Video path: pass through URL immediately
   useEffect(() => {
@@ -252,12 +262,9 @@ export function ResizeNode(props: NodeProps) {
                 style={contentSize ? { width: contentSize.w, height: contentSize.h } : undefined}
               >
                 {resultFormat === 'video' || isVideo ? (
-                  <video
-                    controls
-                    muted
-                    loop
+                  <VideoPreviewPlayer
                     src={resultUrl || inputUrl}
-                    className="w-full h-full object-cover nodrag"
+                    className="w-full h-full"
                   />
                 ) : (
                   <img

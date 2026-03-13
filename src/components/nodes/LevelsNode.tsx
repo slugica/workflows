@@ -7,6 +7,7 @@ import { FlowNodeData, HANDLE_COLORS, resolveFileHandleColor } from '@/lib/types
 import { resolveInput } from '@/lib/resolveInput';
 import { useFlowStore } from '@/store/flowStore';
 import { SlidersHorizontal, RotateCcw } from 'lucide-react';
+import { VideoPreviewPlayer } from './VideoPreviewPlayer';
 
 type Channel = 'rgb' | 'red' | 'green' | 'blue';
 
@@ -260,26 +261,51 @@ export function LevelsNode(props: NodeProps) {
     return { w: Math.round(cw), h: Math.round(ch) };
   }, [imgNatural]);
 
-  // For video input, extract first frame using hidden video + canvas for histogram
+  // For video input, extract a frame for histogram
+  // Fetch as blob to avoid CORS tainting the canvas
   useEffect(() => {
     if (!inputUrl || !isVideo) {
       setThumbnailUrl(null);
       return;
     }
-    const video = document.createElement('video');
-    video.crossOrigin = 'anonymous';
-    video.src = inputUrl;
-    video.currentTime = 0.1;
-    video.muted = true;
-    video.onloadeddata = () => {
-      const canvas = document.createElement('canvas');
-      canvas.width = video.videoWidth;
-      canvas.height = video.videoHeight;
-      canvas.getContext('2d')!.drawImage(video, 0, 0);
-      setThumbnailUrl(canvas.toDataURL('image/png'));
-      setImgNatural({ w: video.videoWidth, h: video.videoHeight });
+    let cancelled = false;
+    let blobUrl: string | null = null;
+
+    (async () => {
+      try {
+        // Fetch video as blob so we get a same-origin URL
+        const res = await fetch(inputUrl);
+        const blob = await res.blob();
+        if (cancelled) return;
+        blobUrl = URL.createObjectURL(blob);
+
+        const video = document.createElement('video');
+        video.muted = true;
+        video.preload = 'auto';
+        video.src = blobUrl;
+
+        video.onloadeddata = () => {
+          video.onseeked = () => {
+            if (cancelled) return;
+            const canvas = document.createElement('canvas');
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+            canvas.getContext('2d')!.drawImage(video, 0, 0);
+            setThumbnailUrl(canvas.toDataURL('image/png'));
+            setImgNatural({ w: video.videoWidth, h: video.videoHeight });
+            video.src = '';
+          };
+          video.currentTime = 0.1;
+        };
+      } catch {
+        // Silently fail — histogram just won't show
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+      if (blobUrl) URL.revokeObjectURL(blobUrl);
     };
-    return () => { video.src = ''; };
   }, [inputUrl, isVideo]);
 
   const onImgLoad = useCallback((e: React.SyntheticEvent<HTMLImageElement>) => {
@@ -304,6 +330,42 @@ export function LevelsNode(props: NodeProps) {
   const gammaSliderPos = gammaToSlider(levels.gamma, levels.shadowIn, levels.highlightIn);
 
   const prevBlobUrlRef = useRef<string | null>(null);
+
+  // Persist FFmpeg op for export chain
+  useEffect(() => {
+    if (isAllDefault(committedLevels)) {
+      useFlowStore.getState().updateNodeSetting(id, 'ffmpegOp', null);
+      return;
+    }
+    // Convert levels to FFmpeg curves filter per channel
+    // curves format: r='sIn/sOut midIn/midOut hIn/hOut':g='...':b='...'
+    const buildCurve = (lv: LevelValues) => {
+      const sIn = (lv.shadowIn / 255).toFixed(3);
+      const sOut = (lv.shadowOut / 255).toFixed(3);
+      const hIn = (lv.highlightIn / 255).toFixed(3);
+      const hOut = (lv.highlightOut / 255).toFixed(3);
+      // Mid-point with gamma: input=0.5 of range, output = gamma-corrected
+      const midIn = ((lv.shadowIn + (lv.highlightIn - lv.shadowIn) * 0.5) / 255).toFixed(3);
+      const midVal = Math.pow(0.5, 1 / lv.gamma);
+      const midOut = ((lv.shadowOut + (lv.highlightOut - lv.shadowOut) * midVal) / 255).toFixed(3);
+      return `${sIn}/${sOut} ${midIn}/${midOut} ${hIn}/${hOut}`;
+    };
+    const parts: string[] = [];
+    const rgb = committedLevels.rgb;
+    const r = committedLevels.red;
+    const g = committedLevels.green;
+    const b = committedLevels.blue;
+    // Apply RGB master + per-channel as chained curves
+    if (!isDefaultLevel(rgb)) parts.push(`curves=m='${buildCurve(rgb)}'`);
+    const perChannel: string[] = [];
+    if (!isDefaultLevel(r)) perChannel.push(`r='${buildCurve(r)}'`);
+    if (!isDefaultLevel(g)) perChannel.push(`g='${buildCurve(g)}'`);
+    if (!isDefaultLevel(b)) perChannel.push(`b='${buildCurve(b)}'`);
+    if (perChannel.length > 0) parts.push(`curves=${perChannel.join(':')}`);
+    if (parts.length > 0) {
+      useFlowStore.getState().updateNodeSetting(id, 'ffmpegOp', { vFilters: parts });
+    }
+  }, [id, committedLevels]);
 
   // Video path: pass through URL immediately
   useEffect(() => {
@@ -388,9 +450,21 @@ export function LevelsNode(props: NodeProps) {
   // Determine the image source for the hidden <img> used for histogram
   const histogramImgSrc = isVideo ? thumbnailUrl : inputUrl;
 
-  // CSS filter approximation for video preview
-  const rgb = committedLevels.rgb;
-  const videoCssFilter = `brightness(${rgb.gamma}) contrast(${(rgb.highlightIn - rgb.shadowIn) / 255})`;
+  // SVG filter for per-channel video preview
+  const svgFilterId = `levels-${id}`;
+  const buildTable = (channelKey: 'red' | 'green' | 'blue') => {
+    const rgb = committedLevels.rgb;
+    const ch = committedLevels[channelKey];
+    const STEPS = 32;
+    const values: number[] = [];
+    for (let i = 0; i <= STEPS; i++) {
+      let v = (i / STEPS) * 255;
+      v = applyLevelToValue(v, rgb);
+      v = applyLevelToValue(v, ch);
+      values.push(Math.max(0, Math.min(1, v / 255)));
+    }
+    return values.map(v => v.toFixed(4)).join(' ');
+  };
 
   return (
     <div
@@ -492,14 +566,21 @@ export function LevelsNode(props: NodeProps) {
               {/* Preview area */}
               <div className="relative bg-[#212121] rounded-2xl overflow-hidden" style={contentSize ? { width: contentSize.w, height: contentSize.h } : undefined}>
                 {isVideo ? (
-                  <video
+                  <VideoPreviewPlayer
                     src={inputUrl}
-                    className="w-full h-full object-cover nodrag"
-                    controls
-                    muted
-                    loop
-                    style={{ filter: videoCssFilter }}
-                  />
+                    className="w-full h-full"
+                    videoStyle={{ filter: `url(#${svgFilterId})` }}
+                  >
+                    <svg width="0" height="0" style={{ position: 'absolute' }}>
+                      <filter id={svgFilterId}>
+                        <feComponentTransfer>
+                          <feFuncR type="table" tableValues={buildTable('red')} />
+                          <feFuncG type="table" tableValues={buildTable('green')} />
+                          <feFuncB type="table" tableValues={buildTable('blue')} />
+                        </feComponentTransfer>
+                      </filter>
+                    </svg>
+                  </VideoPreviewPlayer>
                 ) : (
                   <img src={resultUrl || inputUrl} alt="Levels result" className="w-full h-full object-cover" />
                 )}

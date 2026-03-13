@@ -242,10 +242,12 @@ export function CropNode(props: NodeProps) {
       cropHPct: pctH,
     };
 
+    const ffmpegOp = { vFilters: [`crop=${cropW}:${cropH}:${cropX}:${cropY}`] };
+
     if (isVideo) {
       // For video: pass original URL + crop coords for canvas-based crop in Preview
       useFlowStore.getState().updateNodeData(id, {
-        settings: { ...data.settings, ...cropSettings },
+        settings: { ...data.settings, ...cropSettings, ffmpegOp },
         status: 'done',
         results: [{
           file: {
@@ -276,7 +278,7 @@ export function CropNode(props: NodeProps) {
         const url = URL.createObjectURL(blob);
         prevBlobUrlRef.current = url;
         useFlowStore.getState().updateNodeData(id, {
-          settings: { ...data.settings, ...cropSettings },
+          settings: { ...data.settings, ...cropSettings, ffmpegOp },
           status: 'done',
           results: [{ file: { content: url, format: 'image' } }],
           selectedResultIndex: 0,

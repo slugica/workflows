@@ -142,8 +142,9 @@ export function ExportNode(props: NodeProps) {
     setExportError(null);
 
     try {
-      // Execute the full chain (crop, trim, etc.) via Rendi
-      const result = await executeExportNode(id, allNodes, edges);
+      // Read fresh state from store (useNodes() closure may be stale, missing ffmpegOp updates)
+      const { nodes: freshNodes, edges: freshEdges } = useFlowStore.getState();
+      const result = await executeExportNode(id, freshNodes, freshEdges);
 
       if (!result.success) {
         setExportError(result.error || 'Export failed');
@@ -175,7 +176,7 @@ export function ExportNode(props: NodeProps) {
     } finally {
       setExporting(false);
     }
-  }, [inputUrl, data.name, id, allNodes, edges]);
+  }, [inputUrl, data.name, id]);
 
   const handleExport = isVideo ? handleExportVideo : handleExportImage;
 

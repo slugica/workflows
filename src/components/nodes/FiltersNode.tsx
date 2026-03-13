@@ -6,6 +6,7 @@ import { FlowNodeData, HANDLE_COLORS, resolveFileHandleColor } from '@/lib/types
 import { resolveInput } from '@/lib/resolveInput';
 import { useFlowStore } from '@/store/flowStore';
 import { SlidersHorizontal, RotateCcw } from 'lucide-react';
+import { VideoPreviewPlayer } from './VideoPreviewPlayer';
 
 interface FilterValues {
   exposure: number;    // -100..+100, neutral 0
@@ -163,6 +164,25 @@ export function FiltersNode(props: NodeProps) {
     ? Object.values(data.results[0])[0]?.content
     : null;
 
+  // Persist FFmpeg op for export chain
+  useEffect(() => {
+    const vFilters: string[] = [];
+    const eqParts: string[] = [];
+    if (committed.exposure) eqParts.push(`brightness=${(committed.exposure / 100).toFixed(2)}`);
+    if (committed.contrast) eqParts.push(`contrast=${(1 + committed.contrast / 100).toFixed(2)}`);
+    if (committed.saturation) eqParts.push(`saturation=${(1 + committed.saturation / 100).toFixed(2)}`);
+    if (eqParts.length > 0) vFilters.push(`eq=${eqParts.join(':')}`);
+    const cbParts: string[] = [];
+    if (committed.temperature) cbParts.push(`rs=${(committed.temperature / 100).toFixed(2)}:gs=0:bs=${(-committed.temperature / 100).toFixed(2)}`);
+    if (committed.tint) cbParts.push(`rm=${(committed.tint / 200).toFixed(2)}:gm=${(-committed.tint / 100).toFixed(2)}:bm=${(committed.tint / 200).toFixed(2)}`);
+    if (cbParts.length > 0) vFilters.push(`colorbalance=${cbParts.join(':')}`);
+    if (committed.shadows) {
+      const s = Math.max(0, Math.min(2, 1 + committed.shadows / 100));
+      vFilters.push(`curves=m=0/0 0.25/${(0.25 * s).toFixed(2)} 0.5/0.5 1/1`);
+    }
+    useFlowStore.getState().updateNodeSetting(id, 'ffmpegOp', vFilters.length > 0 ? { vFilters } : null);
+  }, [id, committed]);
+
   const handleReset = () => {
     setFilters({ ...DEFAULT_FILTERS });
     setCommitted({ ...DEFAULT_FILTERS });
@@ -300,13 +320,10 @@ export function FiltersNode(props: NodeProps) {
                 style={contentSize ? { width: contentSize.w, height: contentSize.h } : undefined}
               >
                 {isVideo ? (
-                  <video
+                  <VideoPreviewPlayer
                     src={inputUrl}
-                    controls
-                    muted
-                    loop
-                    className="w-full h-full object-cover nodrag"
-                    style={{ filter: videoCssFilter }}
+                    className="w-full h-full"
+                    videoStyle={{ filter: videoCssFilter }}
                   />
                 ) : (
                   <img

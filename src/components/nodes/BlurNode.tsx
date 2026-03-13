@@ -6,6 +6,7 @@ import { FlowNodeData, HANDLE_COLORS, resolveFileHandleColor } from '@/lib/types
 import { resolveInput } from '@/lib/resolveInput';
 import { useFlowStore } from '@/store/flowStore';
 import { Droplets } from 'lucide-react';
+import { VideoPreviewPlayer } from './VideoPreviewPlayer';
 
 const BLUR_TYPES = [
   { label: 'Gaussian', value: 'gaussian' },
@@ -102,6 +103,16 @@ export function BlurNode(props: NodeProps) {
     if (ch > MAX_H) { ch = MAX_H; cw = ch * ratio; }
     return { w: Math.round(cw), h: Math.round(ch) };
   }, [imgNatural]);
+
+  // Persist FFmpeg op for export chain
+  useEffect(() => {
+    if (committedSize === 0) {
+      useFlowStore.getState().updateNodeSetting(id, 'ffmpegOp', null);
+    } else {
+      const filter = blurType === 'gaussian' ? `gblur=sigma=${committedSize}` : `boxblur=${committedSize}`;
+      useFlowStore.getState().updateNodeSetting(id, 'ffmpegOp', { vFilters: [filter] });
+    }
+  }, [id, blurType, committedSize]);
 
   // Video path: pass through URL immediately
   useEffect(() => {
@@ -308,13 +319,10 @@ export function BlurNode(props: NodeProps) {
                 style={contentSize ? { width: contentSize.w, height: contentSize.h } : undefined}
               >
                 {isVideo ? (
-                  <video
+                  <VideoPreviewPlayer
                     src={inputUrl}
-                    controls
-                    muted
-                    loop
-                    className="w-full h-full object-cover nodrag"
-                    style={{ filter: `blur(${committedSize}px)` }}
+                    className="w-full h-full"
+                    videoStyle={{ filter: `blur(${committedSize}px)` }}
                   />
                 ) : (
                   <img

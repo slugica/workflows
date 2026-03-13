@@ -484,18 +484,27 @@ async function executeCombineVideoNode(nodeId: string, nodes: Node[], edges: Edg
 
 // ── Export node: walk chain, collect operations, execute via Rendi ───────────
 
-interface VideoOp {
-  type: 'crop' | 'trim';
-  cropX?: number; cropY?: number; cropW?: number; cropH?: number;
-  segments?: { start: number; end: number }[];
+/**
+ * Universal FFmpeg operation descriptor.
+ * Each processing node saves this to settings.ffmpegOp so the export chain
+ * can collect operations without knowing about specific node types.
+ */
+interface FfmpegOp {
+  vFilters?: string[];
+  trim?: { segments: { start: number; end: number }[] };
 }
 
 /**
  * Walk backwards from a node through the chain of connected nodes.
- * Collects the source video URL and any operations (crop, trim) along the way.
+ * Collects ffmpegOp from each node's settings — no type-specific logic.
+ *
+ * - Has settings.ffmpegOp → collect it, keep walking
+ * - Has settings.fileUrl (import) → source node, stop
+ * - Has results but no ffmpegOp → processed source (combineVideo, AI, etc.), stop
+ * - Nothing → transparent pass-through, keep walking
  */
-function walkChain(nodeId: string, nodes: Node[], edges: Edge[]): { sourceUrl: string | null; ops: VideoOp[] } {
-  const ops: VideoOp[] = [];
+function walkChain(nodeId: string, nodes: Node[], edges: Edge[]): { sourceUrl: string | null; ops: FfmpegOp[] } {
+  const ops: FfmpegOp[] = [];
   let currentId = nodeId;
 
   for (let depth = 0; depth < 20; depth++) {
@@ -503,28 +512,25 @@ function walkChain(nodeId: string, nodes: Node[], edges: Edge[]): { sourceUrl: s
     if (!node) break;
     const data = getNodeData(node);
 
-    // Collect operation from this node
-    if (node.type === 'crop') {
-      const result = data.results?.[0];
-      const entry = result?.file;
-      if (entry?.cropW && entry?.cropH) {
-        ops.unshift({
-          type: 'crop',
-          cropX: entry.cropX as number,
-          cropY: entry.cropY as number,
-          cropW: entry.cropW as number,
-          cropH: entry.cropH as number,
-        });
-      }
-    } else if (node.type === 'trimVideo') {
-      const segments = data.settings.segments as { start: number; end: number }[] | undefined;
-      if (segments?.length) {
-        ops.unshift({ type: 'trim', segments });
-      }
-    } else if (node.type === 'import') {
-      // Found the source
+    // Skip the export node itself
+    if (node.type === 'export') {
+      // just walk upstream
+    } else if (data.settings.ffmpegOp) {
+      // Node declares its FFmpeg contribution
+      ops.unshift(data.settings.ffmpegOp as FfmpegOp);
+    } else if (data.settings.fileUrl) {
+      // Import/upload node — source
       const url = (data.settings.remoteUrl || data.settings.fileUrl) as string;
       return { sourceUrl: url || null, ops };
+    } else if (data.results?.length) {
+      // Node has a processed result but no ffmpegOp — use result as source
+      const result = data.results[data.selectedResultIndex || 0];
+      if (result) {
+        const entry = Object.values(result)[0];
+        if (entry?.content) {
+          return { sourceUrl: entry.content, ops };
+        }
+      }
     }
 
     // Walk to the upstream node
@@ -540,40 +546,48 @@ function walkChain(nodeId: string, nodes: Node[], edges: Edge[]): { sourceUrl: s
 }
 
 /**
- * Build ffmpeg filter chain from collected operations.
- * Returns { filters, inputArgs, outputArgs } to construct the full command.
+ * Build ffmpeg command pieces from collected FfmpegOps.
+ * Merges all vFilters, handles trim (single segment as -ss/-to, multi as complex filter).
  */
-function buildFfmpegFromOps(ops: VideoOp[], withAudio: boolean): { vFilters: string[]; trimArgs: { ss?: string; to?: string } | null; complexFilter: string | null } {
+function buildFfmpegFromOps(ops: FfmpegOp[], withAudio: boolean): { vFilters: string[]; trimArgs: { ss?: string; to?: string } | null; complexFilter: string | null } {
   const vFilters: string[] = [];
   let trimArgs: { ss?: string; to?: string } | null = null;
   let complexFilter: string | null = null;
 
+  // First pass: collect all vFilters and find trim
+  let trimOp: FfmpegOp['trim'] | null = null;
   for (const op of ops) {
-    if (op.type === 'crop' && op.cropW && op.cropH) {
-      vFilters.push(`crop=${op.cropW}:${op.cropH}:${op.cropX}:${op.cropY}`);
-    } else if (op.type === 'trim' && op.segments?.length) {
-      if (op.segments.length === 1) {
-        trimArgs = {
-          ss: op.segments[0].start.toFixed(3),
-          to: op.segments[0].end.toFixed(3),
-        };
-      } else {
-        // Multi-segment: need filter_complex with concat
-        const parts: string[] = [];
-        for (let i = 0; i < op.segments.length; i++) {
-          const { start, end } = op.segments[i];
-          const extraVf = vFilters.length > 0 ? ',' + vFilters.join(',') : '';
-          parts.push(`[0:v]trim=start=${start.toFixed(3)}:end=${end.toFixed(3)},setpts=PTS-STARTPTS${extraVf}[v${i}]`);
-          if (withAudio) {
-            parts.push(`[0:a]atrim=start=${start.toFixed(3)}:end=${end.toFixed(3)},asetpts=PTS-STARTPTS[a${i}]`);
-          }
+    if (op.vFilters?.length) {
+      vFilters.push(...op.vFilters);
+    }
+    if (op.trim?.segments?.length) {
+      trimOp = op.trim;
+    }
+  }
+
+  // Handle trim
+  if (trimOp) {
+    if (trimOp.segments.length === 1) {
+      trimArgs = {
+        ss: trimOp.segments[0].start.toFixed(3),
+        to: trimOp.segments[0].end.toFixed(3),
+      };
+    } else {
+      // Multi-segment: need filter_complex with concat
+      const parts: string[] = [];
+      const extraVf = vFilters.length > 0 ? ',' + vFilters.join(',') : '';
+      for (let i = 0; i < trimOp.segments.length; i++) {
+        const { start, end } = trimOp.segments[i];
+        parts.push(`[0:v]trim=start=${start.toFixed(3)}:end=${end.toFixed(3)},setpts=PTS-STARTPTS${extraVf}[v${i}]`);
+        if (withAudio) {
+          parts.push(`[0:a]atrim=start=${start.toFixed(3)}:end=${end.toFixed(3)},asetpts=PTS-STARTPTS[a${i}]`);
         }
-        const concatInputs = op.segments.map((_, i) => withAudio ? `[v${i}][a${i}]` : `[v${i}]`).join('');
-        parts.push(`${concatInputs}concat=n=${op.segments.length}:v=1:a=${withAudio ? 1 : 0}${withAudio ? '[outv][outa]' : '[outv]'}`);
-        complexFilter = parts.join(';');
-        // Clear vFilters since they're included in the complex filter
-        vFilters.length = 0;
       }
+      const concatInputs = trimOp.segments.map((_, i) => withAudio ? `[v${i}][a${i}]` : `[v${i}]`).join('');
+      parts.push(`${concatInputs}concat=n=${trimOp.segments.length}:v=1:a=${withAudio ? 1 : 0}${withAudio ? '[outv][outa]' : '[outv]'}`);
+      complexFilter = parts.join(';');
+      // vFilters already included in complex filter segments
+      vFilters.length = 0;
     }
   }
 

@@ -250,7 +250,7 @@ export function TrimVideoNode(props: NodeProps) {
   useEffect(() => {
     if (segments.length === 0 || !duration) return;
     useFlowStore.getState().updateNodeData(id, {
-      settings: { ...data.settings, segments, duration },
+      settings: { ...data.settings, segments, duration, ffmpegOp: { trim: { segments: segments.map(s => ({ start: s.start, end: s.end })) } } },
       status: 'done',
       results: [{
         video: {
