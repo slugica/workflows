@@ -44,7 +44,7 @@ export interface HandleMapping {
 export interface ModelDef {
   id: string;
   title: string;
-  category: 'Image Generation' | 'Image Editing' | 'Upscale' | 'Video Generation' | 'Video Editing' | 'Audio' | 'Utility';
+  category: 'Image Generation' | 'Image Editing' | 'Upscale' | 'Video Generation' | 'Video Upscale' | 'Video Extend' | 'Video Editing' | 'Motion Transfer' | 'Lipsync' | 'Audio' | 'Utility';
   nodeType: 'image' | 'video' | 'audio';
   inputs: HandleMapping[];
   outputs: HandleMapping[];
@@ -673,6 +673,345 @@ export const MODEL_REGISTRY: ModelDef[] = [
         { label: 'Sora 2 (2025-12-08)', value: 'sora-2-2025-12-08' },
         { label: 'Sora 2 (2025-10-06)', value: 'sora-2-2025-10-06' },
       ]},
+    ],
+  },
+
+  // ━━━ Video Editing ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  {
+    id: 'fal-ai/kling-video/o1/video-to-video/edit',
+    title: 'Kling Omni Edit (V2V)',
+    category: 'Video Editing',
+    nodeType: 'video',
+    inputs: [
+      { key: 'prompt', label: 'Prompt', type: 'text', required: true, falParam: 'prompt' },
+      { key: 'videoUrl', label: 'Reference Video', type: 'video', required: true, falParam: 'video_url' },
+      { key: 'ref_1', label: 'Reference Images', type: 'image', required: false, falParam: 'image_urls', dynamic: true, maxDynamic: 4 },
+    ],
+    outputs: [
+      { key: 'video', label: 'Video', type: 'video', falParam: 'video' },
+    ],
+    settings: [
+      { key: 'keep_audio', label: 'Keep Audio', type: 'toggle', default: false },
+    ],
+  },
+
+  // ━━━ Motion Transfer ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  {
+    id: 'fal-ai/wan/v2.2-14b/animate/replace',
+    title: 'Wan 2.2 Replace',
+    category: 'Motion Transfer',
+    nodeType: 'video',
+    inputs: [
+      { key: 'imageUrl', label: 'Character Image', type: 'image', required: true, falParam: 'image_url' },
+      { key: 'videoUrl', label: 'Reference Video', type: 'video', required: true, falParam: 'video_url' },
+    ],
+    outputs: [
+      { key: 'video', label: 'Video', type: 'video', falParam: 'video' },
+    ],
+    settings: [
+      { key: 'resolution', label: 'Resolution', type: 'select', default: '480p', options: [
+        { label: '480p', value: '480p' }, { label: '580p', value: '580p' }, { label: '720p', value: '720p' },
+      ]},
+      { key: 'guidance_scale', label: 'Guidance Scale', type: 'slider', default: 1, min: 1, max: 10, step: 0.5 },
+      { key: 'num_inference_steps', label: 'Steps', type: 'slider', default: 20, min: 2, max: 40, step: 1 },
+      { key: 'seed', label: 'Seed', type: 'number', default: null, description: 'Random if empty' },
+    ],
+  },
+
+  {
+    id: 'fal-ai/wan/v2.2-14b/animate/move',
+    title: 'Wan 2.2 Move',
+    category: 'Motion Transfer',
+    nodeType: 'video',
+    inputs: [
+      { key: 'imageUrl', label: 'Character Image', type: 'image', required: true, falParam: 'image_url' },
+      { key: 'videoUrl', label: 'Reference Video', type: 'video', required: true, falParam: 'video_url' },
+    ],
+    outputs: [
+      { key: 'video', label: 'Video', type: 'video', falParam: 'video' },
+    ],
+    settings: [
+      { key: 'resolution', label: 'Resolution', type: 'select', default: '480p', options: [
+        { label: '480p', value: '480p' }, { label: '580p', value: '580p' }, { label: '720p', value: '720p' },
+      ]},
+      { key: 'guidance_scale', label: 'Guidance Scale', type: 'slider', default: 1, min: 1, max: 10, step: 0.5 },
+      { key: 'num_inference_steps', label: 'Steps', type: 'slider', default: 20, min: 2, max: 40, step: 1 },
+      { key: 'seed', label: 'Seed', type: 'number', default: null, description: 'Random if empty' },
+    ],
+  },
+
+  {
+    id: 'moonvalley/marey/motion-transfer',
+    title: 'MoonValley',
+    category: 'Motion Transfer',
+    nodeType: 'video',
+    inputs: [
+      { key: 'prompt', label: 'Prompt', type: 'text', required: true, falParam: 'prompt' },
+      { key: 'videoUrl', label: 'Reference Video', type: 'video', required: true, falParam: 'video_url' },
+      { key: 'firstFrame', label: 'First Frame', type: 'image', required: false, falParam: 'first_frame_image_url' },
+      { key: 'refImage', label: 'Reference Image', type: 'image', required: false, falParam: 'reference_image_url' },
+    ],
+    outputs: [
+      { key: 'video', label: 'Video', type: 'video', falParam: 'video' },
+    ],
+    settings: [
+      { key: 'negative_prompt', label: 'Negative Prompt', type: 'text', default: '' },
+      { key: 'seed', label: 'Seed', type: 'number', default: null, description: '-1 or empty for random' },
+    ],
+  },
+
+  // ━━━ Lipsync ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  {
+    id: 'fal-ai/kling-video/lipsync/audio-to-video',
+    title: 'Kling LipSync',
+    category: 'Lipsync',
+    nodeType: 'video',
+    inputs: [
+      { key: 'videoUrl', label: 'Video', type: 'video', required: true, falParam: 'video_url' },
+      { key: 'audioUrl', label: 'Audio', type: 'audio', required: true, falParam: 'audio_url' },
+    ],
+    outputs: [
+      { key: 'video', label: 'Video', type: 'video', falParam: 'video' },
+    ],
+    settings: [],
+  },
+
+  {
+    id: 'fal-ai/wan/v2.2-14b/speech-to-video',
+    title: 'Wan 2.2 Speak',
+    category: 'Lipsync',
+    nodeType: 'video',
+    inputs: [
+      { key: 'prompt', label: 'Prompt', type: 'text', required: true, falParam: 'prompt' },
+      { key: 'imageUrl', label: 'Image', type: 'image', required: true, falParam: 'image_url' },
+      { key: 'audioUrl', label: 'Audio', type: 'audio', required: true, falParam: 'audio_url' },
+    ],
+    outputs: [
+      { key: 'video', label: 'Video', type: 'video', falParam: 'video' },
+    ],
+    settings: [
+      { key: 'resolution', label: 'Resolution', type: 'select', default: '480p', options: [
+        { label: '480p', value: '480p' }, { label: '580p', value: '580p' }, { label: '720p', value: '720p' },
+      ]},
+      { key: 'num_frames', label: 'Frames', type: 'slider', default: 80, min: 40, max: 120, step: 4 },
+      { key: 'guidance_scale', label: 'Guidance Scale', type: 'slider', default: 3.5, min: 1, max: 10, step: 0.5 },
+      { key: 'num_inference_steps', label: 'Steps', type: 'slider', default: 27, min: 10, max: 40, step: 1 },
+      { key: 'negative_prompt', label: 'Negative Prompt', type: 'text', default: '' },
+      { key: 'seed', label: 'Seed', type: 'number', default: null, description: 'Random if empty' },
+    ],
+  },
+
+  {
+    id: 'fal-ai/kling-video/ai-avatar/v2/pro',
+    title: 'Kling Avatar 2.0 Pro',
+    category: 'Lipsync',
+    nodeType: 'video',
+    inputs: [
+      { key: 'imageUrl', label: 'Image', type: 'image', required: true, falParam: 'image_url' },
+      { key: 'audioUrl', label: 'Audio', type: 'audio', required: true, falParam: 'audio_url' },
+    ],
+    outputs: [
+      { key: 'video', label: 'Video', type: 'video', falParam: 'video' },
+    ],
+    settings: [],
+  },
+
+  {
+    id: 'fal-ai/kling-video/ai-avatar/v2/standard',
+    title: 'Kling Avatar 2.0 SD',
+    category: 'Lipsync',
+    nodeType: 'video',
+    inputs: [
+      { key: 'imageUrl', label: 'Image', type: 'image', required: true, falParam: 'image_url' },
+      { key: 'audioUrl', label: 'Audio', type: 'audio', required: true, falParam: 'audio_url' },
+    ],
+    outputs: [
+      { key: 'video', label: 'Video', type: 'video', falParam: 'video' },
+    ],
+    settings: [],
+  },
+
+  {
+    id: 'fal-ai/bytedance/omnihuman/v1.5',
+    title: 'OmniHuman 1.5',
+    category: 'Lipsync',
+    nodeType: 'video',
+    inputs: [
+      { key: 'imageUrl', label: 'Image', type: 'image', required: true, falParam: 'image_url' },
+      { key: 'audioUrl', label: 'Audio', type: 'audio', required: true, falParam: 'audio_url' },
+    ],
+    outputs: [
+      { key: 'video', label: 'Video', type: 'video', falParam: 'video' },
+    ],
+    settings: [
+      { key: 'resolution', label: 'Resolution', type: 'select', default: '1080p', options: [
+        { label: '720p', value: '720p' }, { label: '1080p', value: '1080p' },
+      ]},
+      { key: 'turbo_mode', label: 'Turbo Mode', type: 'toggle', default: false },
+    ],
+  },
+
+  {
+    id: 'fal-ai/kling-video/v1/pro/ai-avatar',
+    title: 'Kling Avatar 1.0 Pro',
+    category: 'Lipsync',
+    nodeType: 'video',
+    inputs: [
+      { key: 'imageUrl', label: 'Image', type: 'image', required: true, falParam: 'image_url' },
+      { key: 'audioUrl', label: 'Audio', type: 'audio', required: true, falParam: 'audio_url' },
+    ],
+    outputs: [
+      { key: 'video', label: 'Video', type: 'video', falParam: 'video' },
+    ],
+    settings: [],
+  },
+
+  {
+    id: 'fal-ai/kling-video/v1/standard/ai-avatar',
+    title: 'Kling Avatar 1.0 SD',
+    category: 'Lipsync',
+    nodeType: 'video',
+    inputs: [
+      { key: 'imageUrl', label: 'Image', type: 'image', required: true, falParam: 'image_url' },
+      { key: 'audioUrl', label: 'Audio', type: 'audio', required: true, falParam: 'audio_url' },
+    ],
+    outputs: [
+      { key: 'video', label: 'Video', type: 'video', falParam: 'video' },
+    ],
+    settings: [],
+  },
+
+  {
+    id: 'fal-ai/infinitalk',
+    title: 'Infinitalk',
+    category: 'Lipsync',
+    nodeType: 'video',
+    inputs: [
+      { key: 'prompt', label: 'Prompt', type: 'text', required: true, falParam: 'prompt' },
+      { key: 'imageUrl', label: 'Image', type: 'image', required: true, falParam: 'image_url' },
+      { key: 'audioUrl', label: 'Audio', type: 'audio', required: true, falParam: 'audio_url' },
+    ],
+    outputs: [
+      { key: 'video', label: 'Video', type: 'video', falParam: 'video' },
+    ],
+    settings: [
+      { key: 'resolution', label: 'Resolution', type: 'select', default: '480p', options: [
+        { label: '480p', value: '480p' }, { label: '720p', value: '720p' },
+      ]},
+      { key: 'num_frames', label: 'Frames', type: 'slider', default: 145, min: 41, max: 721, step: 1 },
+      { key: 'acceleration', label: 'Speed', type: 'select', default: 'regular', options: [
+        { label: 'None', value: 'none' }, { label: 'Regular', value: 'regular' }, { label: 'High', value: 'high' },
+      ]},
+      { key: 'seed', label: 'Seed', type: 'number', default: null, description: 'Random if empty' },
+    ],
+  },
+
+  // ━━━ Video Upscale ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  {
+    id: 'fal-ai/topaz/upscale/video',
+    title: 'Topaz Video Upscale',
+    category: 'Video Upscale',
+    nodeType: 'video',
+    inputs: [
+      { key: 'videoUrl', label: 'Video', type: 'video', required: true, falParam: 'video_url' },
+    ],
+    outputs: [
+      { key: 'video', label: 'Video', type: 'video', falParam: 'video' },
+    ],
+    settings: [
+      { key: 'model', label: 'Model', type: 'select', default: 'Proteus', options: [
+        { label: 'Proteus', value: 'Proteus' },
+        { label: 'Artemis HQ', value: 'Artemis HQ' },
+        { label: 'Artemis MQ', value: 'Artemis MQ' },
+        { label: 'Artemis LQ', value: 'Artemis LQ' },
+        { label: 'Nyx', value: 'Nyx' },
+        { label: 'Nyx Fast', value: 'Nyx Fast' },
+        { label: 'Nyx XL', value: 'Nyx XL' },
+        { label: 'Nyx HF', value: 'Nyx HF' },
+        { label: 'Gaia HQ', value: 'Gaia HQ' },
+        { label: 'Gaia CG', value: 'Gaia CG' },
+      ]},
+      { key: 'upscale_factor', label: 'Scale', type: 'slider', default: 2, min: 1, max: 8, step: 0.5 },
+      { key: 'target_fps', label: 'Target FPS', type: 'number', default: null, min: 16, max: 60, description: 'Interpolate to FPS (empty = keep original)' },
+      { key: 'compression', label: 'Compression Fix', type: 'slider', default: 0, min: 0, max: 1, step: 0.1 },
+      { key: 'noise', label: 'Noise Reduction', type: 'slider', default: 0, min: 0, max: 1, step: 0.1 },
+      { key: 'halo', label: 'Halo Reduction', type: 'slider', default: 0, min: 0, max: 1, step: 0.1 },
+      { key: 'recover_detail', label: 'Recover Detail', type: 'slider', default: 0, min: 0, max: 1, step: 0.1 },
+      { key: 'grain', label: 'Film Grain', type: 'slider', default: 0, min: 0, max: 1, step: 0.1 },
+      { key: 'H264_output', label: 'H264 Output', type: 'toggle', default: false },
+    ],
+  },
+
+  // ━━━ Video Extend ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  {
+    id: 'fal-ai/pixverse/extend',
+    title: 'Pixverse Extend',
+    category: 'Video Extend',
+    nodeType: 'video',
+    inputs: [
+      { key: 'videoUrl', label: 'Video', type: 'video', required: true, falParam: 'video_url' },
+      { key: 'prompt', label: 'Prompt', type: 'text', required: true, falParam: 'prompt' },
+      { key: 'negativePrompt', label: 'Negative Prompt', type: 'text', required: false, falParam: 'negative_prompt' },
+    ],
+    outputs: [
+      { key: 'video', label: 'Video', type: 'video', falParam: 'video' },
+    ],
+    settings: [
+      { key: 'model', label: 'Model', type: 'select', default: 'v4.5', options: [
+        { label: 'v3.5', value: 'v3.5' }, { label: 'v4', value: 'v4' }, { label: 'v4.5', value: 'v4.5' },
+        { label: 'v5', value: 'v5' }, { label: 'v5.5', value: 'v5.5' }, { label: 'v5.6', value: 'v5.6' },
+      ]},
+      { key: 'resolution', label: 'Resolution', type: 'select', default: '720p', options: [
+        { label: '360p', value: '360p' }, { label: '540p', value: '540p' },
+        { label: '720p', value: '720p' }, { label: '1080p', value: '1080p' },
+      ]},
+      { key: 'duration', label: 'Duration (s)', type: 'select', default: '5', options: [
+        { label: '5s', value: '5' }, { label: '8s', value: '8' },
+      ]},
+      { key: 'style', label: 'Style', type: 'select', default: '', options: [
+        { label: 'None', value: '' }, { label: 'Anime', value: 'anime' },
+        { label: '3D Animation', value: '3d_animation' }, { label: 'Clay', value: 'clay' },
+        { label: 'Comic', value: 'comic' }, { label: 'Cyberpunk', value: 'cyberpunk' },
+      ]},
+      { key: 'seed', label: 'Seed', type: 'number', default: null, description: 'Random if empty' },
+    ],
+  },
+
+  {
+    id: 'fal-ai/pixverse/extend/fast',
+    title: 'Pixverse Extend Fast',
+    category: 'Video Extend',
+    nodeType: 'video',
+    inputs: [
+      { key: 'videoUrl', label: 'Video', type: 'video', required: true, falParam: 'video_url' },
+      { key: 'prompt', label: 'Prompt', type: 'text', required: true, falParam: 'prompt' },
+      { key: 'negativePrompt', label: 'Negative Prompt', type: 'text', required: false, falParam: 'negative_prompt' },
+    ],
+    outputs: [
+      { key: 'video', label: 'Video', type: 'video', falParam: 'video' },
+    ],
+    settings: [
+      { key: 'model', label: 'Model', type: 'select', default: 'v4.5', options: [
+        { label: 'v3.5', value: 'v3.5' }, { label: 'v4', value: 'v4' }, { label: 'v4.5', value: 'v4.5' },
+        { label: 'v5', value: 'v5' }, { label: 'v5.5', value: 'v5.5' }, { label: 'v5.6', value: 'v5.6' },
+      ]},
+      { key: 'resolution', label: 'Resolution', type: 'select', default: '720p', options: [
+        { label: '360p', value: '360p' }, { label: '540p', value: '540p' }, { label: '720p', value: '720p' },
+      ]},
+      { key: 'duration', label: 'Duration (s)', type: 'select', default: '5', options: [
+        { label: '5s', value: '5' }, { label: '8s', value: '8' },
+      ]},
+      { key: 'style', label: 'Style', type: 'select', default: '', options: [
+        { label: 'None', value: '' }, { label: 'Anime', value: 'anime' },
+        { label: '3D Animation', value: '3d_animation' }, { label: 'Clay', value: 'clay' },
+        { label: 'Comic', value: 'comic' }, { label: 'Cyberpunk', value: 'cyberpunk' },
+      ]},
+      { key: 'seed', label: 'Seed', type: 'number', default: null, description: 'Random if empty' },
     ],
   },
 ];

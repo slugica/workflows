@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useState, useRef, useEffect } from 'react';
+import { useViewport } from '@xyflow/react';
 import { useFlowStore } from '@/store/flowStore';
 import {
   ArrowUpFromDot,
@@ -39,6 +40,7 @@ interface QuickActionsBarProps {
 }
 
 export function QuickActionsBar({ nodeId, selected, hovered, fileUrl, onFullscreen }: QuickActionsBarProps) {
+  const { zoom } = useViewport();
   const addConnectedNode = useFlowStore((s) => s.addConnectedNode);
   const [delayedVisible, setDelayedVisible] = useState(false);
   const timerRef = useRef<ReturnType<typeof setTimeout>>(undefined);
@@ -73,9 +75,10 @@ export function QuickActionsBar({ nodeId, selected, hovered, fileUrl, onFullscre
 
   return (
     <div
-      className={`absolute bottom-full left-1/2 -translate-x-1/2 mb-8 flex items-center gap-1 bg-[#1a1a1a] border border-[#333] rounded-full px-2 py-1.5 transition-opacity duration-200 nodrag ${
+      className={`absolute bottom-full left-1/2 mb-8 flex items-center gap-1 bg-[#1a1a1a] border border-[#333] rounded-full px-2 py-1.5 transition-opacity duration-200 nodrag ${
         visible ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'
       }`}
+      style={{ transform: `translateX(-50%) scale(${1 / zoom})`, transformOrigin: 'bottom center' }}
       onClick={(e) => e.stopPropagation()}
       onMouseEnter={() => {
         clearTimeout(timerRef.current);

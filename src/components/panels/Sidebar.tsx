@@ -48,6 +48,11 @@ const SECTIONS: Section[] = [
     label: 'Video',
     subs: [
       { label: 'Generate Video', icon: <Video size={14} />, categories: ['Video Generation'] },
+      { label: 'Edit Video', icon: <Pencil size={14} />, categories: ['Video Editing'] },
+      { label: 'Motion Transfer', icon: <Video size={14} />, categories: ['Motion Transfer'] },
+      { label: 'Lipsync', icon: <Video size={14} />, categories: ['Lipsync'] },
+      { label: 'Enhance Video', icon: <Search size={14} />, categories: ['Video Upscale'] },
+      { label: 'Extend Video', icon: <Video size={14} />, categories: ['Video Extend'] },
       { label: 'Video Utility', icon: <Wrench size={14} />, categories: ['Video Utility', 'Shared Utility'] },
     ],
   },
