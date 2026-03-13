@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useRef, useState, useEffect } from 'react';
+import { useCallback, useRef, useState, useEffect, useMemo } from 'react';
 import {
   ReactFlow,
   Background,
@@ -403,6 +403,8 @@ export function FlowCanvas() {
     selectNode,
   } = useFlowStore();
   const drawingMode = useFlowStore((s) => s.drawingMode);
+  const connectingHandleType = useFlowStore((s) => s.connectingHandleType);
+  const setConnectingHandleType = useFlowStore((s) => s.setConnectingHandleType);
   const updateNodeInternals = useUpdateNodeInternals();
 
   // Wrap onConnect to update node internals after dynamic handle spawning
@@ -532,6 +534,22 @@ export function FlowCanvas() {
     handleConnect(newConnection);
   }, [handleConnect]);
 
+  const connectingSourceId = useRef<string | null>(null);
+
+  const onConnectStart = useCallback((_: unknown, params: { handleId: string | null }) => {
+    if (!params.handleId) return;
+    const info = parseHandleInfo(params.handleId);
+    if (info) {
+      setConnectingHandleType(info.type);
+      connectingSourceId.current = params.handleId.split('|')[0];
+    }
+  }, [setConnectingHandleType]);
+
+  const onConnectEnd = useCallback(() => {
+    setConnectingHandleType(null);
+    connectingSourceId.current = null;
+  }, [setConnectingHandleType]);
+
   const isValidConnection: IsValidConnection = useCallback((connection) => {
     const sourceHandle = connection.sourceHandle;
     const targetHandle = connection.targetHandle;
@@ -539,9 +557,10 @@ export function FlowCanvas() {
     const sourceInfo = parseHandleInfo(sourceHandle);
     const targetInfo = parseHandleInfo(targetHandle);
     if (!sourceInfo || !targetInfo) return false;
-    const fileTypes = new Set(['file', 'image', 'video', 'audio']);
+    const mediaTypes = new Set(['file', 'image', 'video', 'audio']);
     const typesMatch = sourceInfo.type === targetInfo.type
-      || (fileTypes.has(sourceInfo.type) && fileTypes.has(targetInfo.type));
+      || sourceInfo.type === 'file' && mediaTypes.has(targetInfo.type)
+      || targetInfo.type === 'file' && mediaTypes.has(sourceInfo.type);
     if (!typesMatch) return false;
     if (connection.source === connection.target) return false;
     // Prevent same source node from connecting to multiple inputs on the same target
@@ -553,15 +572,35 @@ export function FlowCanvas() {
     return true;
   }, []);
 
+  // Dim incompatible nodes while dragging a connection
+  const displayNodes = useMemo(() => {
+    if (!connectingHandleType) return nodes;
+    const ct = connectingHandleType;
+    const mediaTypes = new Set(['file', 'image', 'video', 'audio']);
+    return nodes.map((n) => {
+      if (n.type === 'section' || n.id === connectingSourceId.current) return n;
+      const nd = n.data as unknown as FlowNodeData;
+      if (!nd.handles) return n;
+      const hasCompatible = nd.handles.inputs.some((h) => {
+        if (h.type === ct || h.type === 'file' || ct === 'file') return mediaTypes.has(h.type) && mediaTypes.has(ct);
+        return h.type === ct;
+      });
+      if (hasCompatible) return n;
+      return { ...n, className: `${n.className || ''} node-dimmed` };
+    });
+  }, [nodes, connectingHandleType]);
+
   return (
     <div className="flex-1 h-full relative" ref={reactFlowWrapper}>
       <SectionDrawingOverlay />
       <ReactFlow
-        nodes={nodes}
+        nodes={displayNodes}
         edges={edges}
         onNodesChange={onNodesChange}
         onEdgesChange={onEdgesChange}
         onConnect={handleConnect}
+        onConnectStart={onConnectStart}
+        onConnectEnd={onConnectEnd}
         isValidConnection={isValidConnection}
         onDragOver={onDragOver}
         onDrop={onDrop}

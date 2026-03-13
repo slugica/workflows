@@ -85,6 +85,18 @@ body {
   transition: box-shadow 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
+/* Dimmed nodes during incompatible connection drag */
+.react-flow__node.node-dimmed {
+  opacity: 0.5;
+  filter: blur(2px);
+  pointer-events: none;
+  transition: opacity 0.2s, filter 0.2s;
+}
+
+.react-flow__node.node-dimmed .handle-label {
+  opacity: 0 !important;
+}
+
 /* Default cursor: arrow for selection mode, let React Flow handle grab when panning */
 .react-flow__pane.selection {
   cursor: default !important;

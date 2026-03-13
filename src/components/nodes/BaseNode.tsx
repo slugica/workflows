@@ -1,11 +1,13 @@
 'use client';
 
 import { useRef, useCallback, useMemo, useState, type ReactNode } from 'react';
+import { createPortal } from 'react-dom';
 import { Handle, Position, useEdges, useNodes, NodeResizer, type NodeProps } from '@xyflow/react';
 import { FlowNodeData, HANDLE_COLORS, resolveFileHandleColor } from '@/lib/types';
 import { useFlowStore } from '@/store/flowStore';
 import { Upload, Type, ImageIcon, Video, AudioLines, Play, Loader } from 'lucide-react';
 import { ResultNavOverlay } from '@/components/nodes/ResultNavOverlay';
+import { QuickActionsBar } from '@/components/nodes/QuickActionsBar';
 
 const TYPE_ICONS: Record<string, ReactNode> = {
   import: <Upload size={18} />,
@@ -99,11 +101,36 @@ export function BaseNode(props: NodeProps) {
 
   const isPrompt = nodeType === 'prompt';
 
+  // Show quick actions on any node with image/file output (not prompt)
+  const showQuickActions = useMemo(() => {
+    if (isPrompt) return false;
+    return data.handles.outputs.some((h) => h.type === 'file' || h.type === 'image');
+  }, [isPrompt, data.handles.outputs]);
+
+  const imageUrl = useMemo(() => {
+    if (nodeType === 'import' && (data.settings.fileType as string)?.startsWith('image/') && data.settings.fileUrl)
+      return data.settings.fileUrl as string;
+    if (data.results?.length) {
+      const result = data.results[data.selectedResultIndex || 0];
+      if (result) {
+        const entry = Object.values(result)[0];
+        if (entry?.content && entry.format !== 'video') return entry.content;
+      }
+    }
+    return undefined;
+  }, [nodeType, data.settings.fileType, data.settings.fileUrl, data.results, data.selectedResultIndex]);
+
+  // Fullscreen modal
+  const [showFullscreen, setShowFullscreen] = useState(false);
+  const [isHovered, setIsHovered] = useState(false);
+
   return (
     <div
       className={`group relative flex flex-col items-center gap-1 ${isPrompt ? 'w-full h-full' : ''}`}
       style={isPrompt ? undefined : { width: contentSize ? contentSize.w + 36 : 356 }}
       onClick={() => selectNode(id)}
+      onMouseEnter={() => setIsHovered(true)}
+      onMouseLeave={() => setIsHovered(false)}
     >
       {isPrompt && (
         <NodeResizer
@@ -114,6 +141,35 @@ export function BaseNode(props: NodeProps) {
           handleClassName="!w-3 !h-3 !bg-transparent !border-none !rounded-none"
         />
       )}
+
+      {/* Quick actions bar */}
+      {showQuickActions && (
+        <QuickActionsBar
+          nodeId={id}
+          selected={!!selected}
+          hovered={isHovered}
+          fileUrl={imageUrl}
+          onFullscreen={imageUrl ? () => setShowFullscreen(true) : undefined}
+        />
+      )}
+
+      {/* Fullscreen modal — portaled to body to escape React Flow transform */}
+      {showFullscreen && imageUrl && createPortal(
+        <div
+          className="fixed inset-0 z-[9999] bg-black/90 flex items-center justify-center cursor-pointer"
+          onClick={() => setShowFullscreen(false)}
+        >
+          <img src={imageUrl} alt="" className="max-w-[90vw] max-h-[90vh] object-contain" />
+          <button
+            className="absolute top-6 right-6 w-10 h-10 flex items-center justify-center rounded-full bg-[#1a1a1a] border border-[#333] text-white hover:bg-[#333] transition-colors"
+            onClick={() => setShowFullscreen(false)}
+          >
+            &times;
+          </button>
+        </div>,
+        document.body
+      )}
+
       {/* Top info bar - above the card */}
       <div className="absolute bottom-full left-0 mb-1 flex w-full flex-row items-center justify-between gap-2 px-1">
         <div className="flex items-center justify-center p-0.5">

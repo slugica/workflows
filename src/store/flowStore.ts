@@ -28,6 +28,8 @@ interface FlowState {
   redoStack: Snapshot[];
   drawingMode: DrawingMode;
   setDrawingMode: (mode: DrawingMode) => void;
+  connectingHandleType: string | null;
+  setConnectingHandleType: (type: string | null) => void;
   onNodesChange: OnNodesChange;
   onEdgesChange: OnEdgesChange;
   onConnect: OnConnect;
@@ -36,6 +38,7 @@ interface FlowState {
   selectNode: (id: string | null) => void;
   updateNodeData: (id: string, data: Partial<FlowNodeData>) => void;
   updateNodeSetting: (id: string, key: string, value: unknown) => void;
+  addConnectedNode: (sourceId: string, type: FlowNodeType, templateLabel: string) => void;
   deleteNode: (id: string) => void;
   runNode: (id: string) => Promise<void>;
   uploadFileToNewNode: (file: File, position: { x: number; y: number }) => void;
@@ -66,6 +69,8 @@ export const useFlowStore = create<FlowState>((set, get) => ({
   redoStack: [],
   drawingMode: 'none',
   setDrawingMode: (mode) => set({ drawingMode: mode }),
+  connectingHandleType: null,
+  setConnectingHandleType: (type) => set({ connectingHandleType: type }),
 
   onNodesChange: (changes) => {
     set({ nodes: applyNodeChanges(changes, get().nodes) });
@@ -128,8 +133,10 @@ export const useFlowStore = create<FlowState>((set, get) => ({
     const sourceType = parseHandleType(sourceHandle);
     const targetType = parseHandleType(targetHandle);
     if (!sourceType || !targetType) return;
-    const fileTypes = new Set(['file', 'image', 'video', 'audio']);
-    const typesMatch = sourceType === targetType || (fileTypes.has(sourceType) && fileTypes.has(targetType));
+    const mediaTypes = new Set(['file', 'image', 'video', 'audio']);
+    const typesMatch = sourceType === targetType
+      || sourceType === 'file' && mediaTypes.has(targetType)
+      || targetType === 'file' && mediaTypes.has(sourceType);
     if (!typesMatch) return;
 
     get().pushUndo();
@@ -236,6 +243,50 @@ export const useFlowStore = create<FlowState>((set, get) => ({
       nodes: [...get().nodes.map((n) => ({ ...n, selected: false })), { ...newNode, selected: true }],
       selectedNodeId: nodeId,
     });
+  },
+
+  addConnectedNode: (sourceId, type, templateLabel) => {
+    const sourceNode = get().nodes.find((n) => n.id === sourceId);
+    if (!sourceNode) return;
+    const sourceData = sourceNode.data as unknown as FlowNodeData;
+
+    // Find source output handle (prefer file/image/video)
+    const sourceOutput = sourceData.handles.outputs.find(
+      (h) => h.type === 'file' || h.type === 'image' || h.type === 'video'
+    );
+    if (!sourceOutput) return;
+
+    // Position new node to the right
+    const newPos = {
+      x: sourceNode.position.x + (sourceNode.measured?.width ?? 400) + 100,
+      y: sourceNode.position.y,
+    };
+
+    // Create the node (this pushes undo, sets selectedNodeId)
+    get().addNode(type, templateLabel, newPos);
+    const newNodeId = get().selectedNodeId;
+    if (!newNodeId) return;
+
+    // Find target input handle (prefer image, then file, then video)
+    const newNode = get().nodes.find((n) => n.id === newNodeId);
+    if (!newNode) return;
+    const newData = newNode.data as unknown as FlowNodeData;
+    const targetInput =
+      newData.handles.inputs.find((h) => h.type === 'image') ||
+      newData.handles.inputs.find((h) => h.type === 'file') ||
+      newData.handles.inputs.find((h) => h.type === 'video');
+    if (!targetInput) return;
+
+    // Connect via onConnect (handles edge creation + dynamic handle spawning)
+    get().onConnect({
+      source: sourceId,
+      target: newNodeId,
+      sourceHandle: sourceOutput.id,
+      targetHandle: targetInput.id,
+    });
+
+    // Re-select the new node
+    set({ selectedNodeId: newNodeId });
   },
 
   addSection: (position, size) => {
