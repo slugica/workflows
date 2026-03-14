@@ -44,6 +44,7 @@ import { VideoIteratorNode } from '@/components/nodes/VideoIteratorNode';
 import { ExtractFrameNode } from '@/components/nodes/ExtractFrameNode';
 import { FlowNodeType, HANDLE_COLORS, resolveFileHandleColor, type FlowNodeData, type HandleDataType } from '@/lib/types';
 import { ConnectionMenu } from '@/components/ConnectionMenu';
+import { MultiSelectionToolbar } from '@/components/MultiSelectionToolbar';
 
 import { BaseEdge, type EdgeProps } from '@xyflow/react';
 
@@ -722,6 +723,7 @@ export function FlowCanvas() {
 
   return (
     <div className="flex-1 h-full relative" ref={reactFlowWrapper}>
+      <MultiSelectionToolbar />
       <SectionDrawingOverlay />
       {connectionMenu && (
         <>

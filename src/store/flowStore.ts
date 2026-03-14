@@ -46,6 +46,11 @@ interface FlowState {
   undo: () => void;
   redo: () => void;
   pushUndo: () => void;
+  alignNodes: (nodeIds: string[], alignment: 'left' | 'centerH' | 'right' | 'top' | 'centerV' | 'bottom' | 'distributeH' | 'distributeV') => void;
+  tidyUpNodes: (nodeIds: string[]) => void;
+  wrapInSection: (nodeIds: string[]) => void;
+  duplicateSection: (sectionId: string) => void;
+  ungroupSection: (sectionId: string) => void;
   toJSON: () => string;
   loadJSON: (json: string) => void;
 }
@@ -363,6 +368,235 @@ export const useFlowStore = create<FlowState>((set, get) => ({
     set({
       nodes: [{ ...newNode, selected: true }, ...updatedNodes],
       selectedNodeId: nodeId,
+    });
+  },
+
+  alignNodes: (nodeIds, alignment) => {
+    const store = get();
+    store.pushUndo();
+    const nodes = store.nodes;
+    const targets = nodes.filter((n) => nodeIds.includes(n.id) && n.type !== 'section');
+    if (targets.length < 2) return;
+
+    // Resolve absolute positions
+    const getAbsPos = (n: Node) => {
+      if (n.parentId) {
+        const parent = nodes.find((p) => p.id === n.parentId);
+        return parent
+          ? { x: parent.position.x + n.position.x, y: parent.position.y + n.position.y }
+          : n.position;
+      }
+      return n.position;
+    };
+    const getW = (n: Node) => n.measured?.width ?? (n.style?.width as number) ?? 200;
+    const getH = (n: Node) => n.measured?.height ?? (n.style?.height as number) ?? 200;
+
+    const absPositions = new Map(targets.map((n) => [n.id, getAbsPos(n)]));
+
+    let newAbsPositions: Map<string, { x: number; y: number }>;
+
+    switch (alignment) {
+      case 'left': {
+        const minX = Math.min(...targets.map((n) => absPositions.get(n.id)!.x));
+        newAbsPositions = new Map(targets.map((n) => [n.id, { x: minX, y: absPositions.get(n.id)!.y }]));
+        break;
+      }
+      case 'right': {
+        const maxR = Math.max(...targets.map((n) => absPositions.get(n.id)!.x + getW(n)));
+        newAbsPositions = new Map(targets.map((n) => [n.id, { x: maxR - getW(n), y: absPositions.get(n.id)!.y }]));
+        break;
+      }
+      case 'centerH': {
+        const cx = targets.reduce((s, n) => s + absPositions.get(n.id)!.x + getW(n) / 2, 0) / targets.length;
+        newAbsPositions = new Map(targets.map((n) => [n.id, { x: cx - getW(n) / 2, y: absPositions.get(n.id)!.y }]));
+        break;
+      }
+      case 'top': {
+        const minY = Math.min(...targets.map((n) => absPositions.get(n.id)!.y));
+        newAbsPositions = new Map(targets.map((n) => [n.id, { x: absPositions.get(n.id)!.x, y: minY }]));
+        break;
+      }
+      case 'bottom': {
+        const maxB = Math.max(...targets.map((n) => absPositions.get(n.id)!.y + getH(n)));
+        newAbsPositions = new Map(targets.map((n) => [n.id, { x: absPositions.get(n.id)!.x, y: maxB - getH(n) }]));
+        break;
+      }
+      case 'centerV': {
+        const cy = targets.reduce((s, n) => s + absPositions.get(n.id)!.y + getH(n) / 2, 0) / targets.length;
+        newAbsPositions = new Map(targets.map((n) => [n.id, { x: absPositions.get(n.id)!.x, y: cy - getH(n) / 2 }]));
+        break;
+      }
+      case 'distributeH': {
+        const sorted = [...targets].sort((a, b) => absPositions.get(a.id)!.x - absPositions.get(b.id)!.x);
+        const minX = absPositions.get(sorted[0].id)!.x;
+        const maxX = absPositions.get(sorted[sorted.length - 1].id)!.x;
+        const step = (maxX - minX) / (sorted.length - 1);
+        newAbsPositions = new Map(sorted.map((n, i) => [n.id, { x: minX + step * i, y: absPositions.get(n.id)!.y }]));
+        break;
+      }
+      case 'distributeV': {
+        const sorted = [...targets].sort((a, b) => absPositions.get(a.id)!.y - absPositions.get(b.id)!.y);
+        const minY = absPositions.get(sorted[0].id)!.y;
+        const maxY = absPositions.get(sorted[sorted.length - 1].id)!.y;
+        const step = (maxY - minY) / (sorted.length - 1);
+        newAbsPositions = new Map(sorted.map((n, i) => [n.id, { x: absPositions.get(n.id)!.x, y: minY + step * i }]));
+        break;
+      }
+      default:
+        return;
+    }
+
+    // Convert back to relative if parented
+    set({
+      nodes: nodes.map((n) => {
+        const newAbs = newAbsPositions.get(n.id);
+        if (!newAbs) return n;
+        if (n.parentId) {
+          const parent = nodes.find((p) => p.id === n.parentId);
+          if (parent) return { ...n, position: { x: newAbs.x - parent.position.x, y: newAbs.y - parent.position.y } };
+        }
+        return { ...n, position: newAbs };
+      }),
+    });
+  },
+
+  tidyUpNodes: (nodeIds) => {
+    const store = get();
+    store.pushUndo();
+    const nodes = store.nodes;
+    const targets = nodes.filter((n) => nodeIds.includes(n.id) && n.type !== 'section');
+    if (targets.length < 2) return;
+
+    // Sort by Y then X
+    const sorted = [...targets].sort((a, b) => a.position.y - b.position.y || a.position.x - b.position.x);
+    const gap = 50;
+    const cols = Math.ceil(Math.sqrt(sorted.length));
+    const startX = sorted[0].position.x;
+    const startY = sorted[0].position.y;
+
+    const posMap = new Map<string, { x: number; y: number }>();
+    let curX = startX;
+    let curY = startY;
+    let rowH = 0;
+    sorted.forEach((n, i) => {
+      if (i > 0 && i % cols === 0) {
+        curX = startX;
+        curY += rowH + gap;
+        rowH = 0;
+      }
+      posMap.set(n.id, { x: curX, y: curY });
+      const w = n.measured?.width ?? (n.style?.width as number) ?? 200;
+      const h = n.measured?.height ?? (n.style?.height as number) ?? 200;
+      curX += w + gap;
+      rowH = Math.max(rowH, h);
+    });
+
+    set({
+      nodes: nodes.map((n) => {
+        const p = posMap.get(n.id);
+        return p ? { ...n, position: p } : n;
+      }),
+    });
+  },
+
+  wrapInSection: (nodeIds) => {
+    const store = get();
+    const nodes = store.nodes;
+    const targets = nodes.filter((n) => nodeIds.includes(n.id) && n.type !== 'section' && !n.parentId);
+    if (targets.length === 0) return;
+
+    // Compute bounding box
+    const pad = 60;
+    const topPad = 40;
+    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+    for (const n of targets) {
+      const w = n.measured?.width ?? (n.style?.width as number) ?? 200;
+      const h = n.measured?.height ?? (n.style?.height as number) ?? 200;
+      minX = Math.min(minX, n.position.x);
+      minY = Math.min(minY, n.position.y);
+      maxX = Math.max(maxX, n.position.x + w);
+      maxY = Math.max(maxY, n.position.y + h);
+    }
+
+    store.addSection(
+      { x: minX - pad, y: minY - topPad },
+      { width: maxX - minX + pad * 2, height: maxY - minY + topPad + pad },
+    );
+  },
+
+  duplicateSection: (sectionId) => {
+    const store = get();
+    store.pushUndo();
+    const section = store.nodes.find((n) => n.id === sectionId && n.type === 'section');
+    if (!section) return;
+
+    const newSectionId = generateId();
+    const offset = 40;
+    const children = store.nodes.filter((n) => n.parentId === sectionId);
+    const idMap = new Map<string, string>();
+    idMap.set(sectionId, newSectionId);
+    for (const c of children) idMap.set(c.id, generateId());
+
+    const newSection: Node = {
+      ...section,
+      id: newSectionId,
+      position: { x: section.position.x + offset, y: section.position.y + offset },
+      selected: false,
+    };
+
+    const newChildren = children.map((c) => ({
+      ...c,
+      id: idMap.get(c.id)!,
+      parentId: newSectionId,
+      selected: false,
+    }));
+
+    // Duplicate edges between cloned nodes
+    const oldIds = new Set([sectionId, ...children.map((c) => c.id)]);
+    const newEdges = store.edges
+      .filter((e) => oldIds.has(e.source) && oldIds.has(e.target))
+      .map((e) => ({
+        ...e,
+        id: generateId(),
+        source: idMap.get(e.source) ?? e.source,
+        target: idMap.get(e.target) ?? e.target,
+        sourceHandle: e.sourceHandle?.replace(e.source, idMap.get(e.source) ?? e.source) ?? null,
+        targetHandle: e.targetHandle?.replace(e.target, idMap.get(e.target) ?? e.target) ?? null,
+      }));
+
+    // Sections before children for z-ordering
+    const sections = store.nodes.filter((n) => n.type === 'section');
+    const rest = store.nodes.filter((n) => n.type !== 'section');
+    set({
+      nodes: [...sections, newSection, ...rest, ...newChildren],
+      edges: [...store.edges, ...newEdges],
+    });
+  },
+
+  ungroupSection: (sectionId) => {
+    const store = get();
+    store.pushUndo();
+    const section = store.nodes.find((n) => n.id === sectionId && n.type === 'section');
+    if (!section) return;
+
+    set({
+      nodes: store.nodes
+        .filter((n) => n.id !== sectionId)
+        .map((n) => {
+          if (n.parentId === sectionId) {
+            return {
+              ...n,
+              parentId: undefined,
+              extent: undefined,
+              position: {
+                x: n.position.x + section.position.x,
+                y: n.position.y + section.position.y,
+              },
+            };
+          }
+          return n;
+        }),
+      edges: store.edges.filter((e) => e.source !== sectionId && e.target !== sectionId),
     });
   },
 

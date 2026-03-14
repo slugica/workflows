@@ -56,9 +56,13 @@ interface QuickActionsBarProps {
 export function QuickActionsBar({ nodeId, selected, hovered, mode, fileUrl, onFullscreen }: QuickActionsBarProps) {
   const { zoom } = useViewport();
   const addConnectedNode = useFlowStore((s) => s.addConnectedNode);
+  const nodes = useFlowStore((s) => s.nodes);
   const [delayedVisible, setDelayedVisible] = useState(false);
   const timerRef = useRef<ReturnType<typeof setTimeout>>(undefined);
   const showTimerRef = useRef<ReturnType<typeof setTimeout>>(undefined);
+
+  // Hide when multiple nodes are selected (multi-selection toolbar takes over)
+  const multiSelected = useMemo(() => nodes.filter((n) => n.selected && n.type !== 'section').length >= 2, [nodes]);
 
   const actions = useMemo(() => mode === 'video' ? VIDEO_ACTIONS : IMAGE_ACTIONS, [mode]);
 
@@ -86,6 +90,8 @@ export function QuickActionsBar({ nodeId, selected, hovered, mode, fileUrl, onFu
     a.download = '';
     a.click();
   }, [fileUrl]);
+
+  if (multiSelected) return null;
 
   return (
     <div
