@@ -344,7 +344,7 @@ export const useFlowStore = create<FlowState>((set, get) => ({
       id: nodeId,
       type: 'section',
       position,
-      data: { label: 'Section' },
+      data: { label: `Section ${get().nodes.filter((n) => n.type === 'section').length + 1}` },
       style: { width: w, height: h },
     };
     // Parent existing nodes that fall inside the new section

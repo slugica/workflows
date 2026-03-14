@@ -35,10 +35,7 @@ export const SectionNode = memo(function SectionNode(props: NodeProps) {
 
   const [running, setRunning] = useState(false);
   const [colorOpen, setColorOpen] = useState(false);
-  const [hovered, setHovered] = useState(false);
   const colorRef = useRef<HTMLDivElement>(null);
-
-  const visible = selected || hovered;
 
   // Close color picker on outside click
   useEffect(() => {
@@ -116,11 +113,12 @@ export const SectionNode = memo(function SectionNode(props: NodeProps) {
       <div
         className="w-full h-full border"
         style={{ borderColor: color + '55', backgroundColor: color + '10' }}
-        onMouseEnter={() => setHovered(true)}
-        onMouseLeave={() => setHovered(false)}
       >
         {/* Section label */}
-        <div className="absolute -top-7 left-0 flex items-center gap-2">
+        <div
+          className="absolute left-0 flex items-center gap-2"
+          style={{ top: 0, transform: `translateY(calc(-100% - 8px)) scale(${1 / zoom})`, transformOrigin: 'bottom left' }}
+        >
           <input
             className="text-[12px] text-zinc-400 bg-[#171717] border border-[#2a2a2a] rounded-md px-2 py-0.5 outline-none max-w-[160px] nodrag"
             defaultValue={label}
@@ -133,12 +131,10 @@ export const SectionNode = memo(function SectionNode(props: NodeProps) {
         {/* Toolbar — centered above section */}
         <div
           className={`absolute left-1/2 bottom-full mb-8 flex items-center gap-1 bg-[#1a1a1a] border border-[#333] rounded-full px-2 py-1.5 nodrag transition-opacity duration-200 ${
-            visible ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'
+            selected ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'
           }`}
           style={{ transform: `translateX(-50%) scale(${1 / zoom})`, transformOrigin: 'bottom center' }}
           onClick={(e) => e.stopPropagation()}
-          onMouseEnter={() => setHovered(true)}
-          onMouseLeave={() => setHovered(false)}
         >
           {/* Color picker */}
           <div className="relative" ref={colorRef}>
