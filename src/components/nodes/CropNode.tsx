@@ -9,6 +9,8 @@ import { resolveInput } from '@/lib/resolveInput';
 import { useFlowStore } from '@/store/flowStore';
 import { Crop as CropIcon, Link, Unlink } from 'lucide-react';
 import { NodeQuickActions } from './NodeQuickActions';
+import { NodeSelect, NodeNumberInput, NodeIconButton, NodeLabel } from './controls';
+import { theme } from '@/lib/theme';
 
 const ASPECT_RATIOS: { label: string; value: number | undefined }[] = [
   { label: 'Free', value: undefined },
@@ -313,11 +315,15 @@ export function CropNode(props: NodeProps) {
       {/* Card */}
       <div
         className={`
-          bg-[#171717] rounded-[24px] border-2 border-[#212121] relative flex flex-col items-start
+          rounded-[24px] border-2 relative flex flex-col items-start
           p-4 pt-3 w-full
           drop-shadow-sm group-hover:drop-shadow-md
           ${selected ? 'border-white/30 show-labels' : ''}
         `}
+        style={{
+          backgroundColor: theme.surface1,
+          borderColor: selected ? undefined : theme.border1,
+        }}
       >
         {/* Header */}
         <header className="mb-2 flex h-7 items-center justify-between gap-2 self-stretch">
@@ -343,7 +349,7 @@ export function CropNode(props: NodeProps) {
                   id={handle.id}
                   className="!relative !transform-none !w-[18px] !h-[18px] !rounded-full !border-2 !left-0 !top-0 !flex !items-center !justify-center"
                   style={{
-                    backgroundColor: isConnected ? color : '#171717',
+                    backgroundColor: isConnected ? color : theme.surface1,
                     borderColor: color,
                   }}
                 >
@@ -375,7 +381,7 @@ export function CropNode(props: NodeProps) {
                   id={handle.id}
                   className="!relative !transform-none !w-[18px] !h-[18px] !rounded-full !border-2 !left-0 !top-0 !flex !items-center !justify-center"
                   style={{
-                    backgroundColor: isConnected ? color : '#171717',
+                    backgroundColor: isConnected ? color : theme.surface1,
                     borderColor: color,
                   }}
                 >
@@ -449,7 +455,7 @@ export function CropNode(props: NodeProps) {
               </div>
             </>
           ) : (
-            <div className="bg-[#212121] rounded-2xl checkerboard flex items-center justify-center aspect-square">
+            <div className="rounded-2xl checkerboard flex items-center justify-center aspect-square" style={{ backgroundColor: theme.previewBg }}>
               <span className="text-zinc-500 text-sm">Connect a file input</span>
             </div>
           )}
@@ -459,45 +465,36 @@ export function CropNode(props: NodeProps) {
         {showSettings && (
           <div className="mt-3 space-y-2 self-stretch">
             <div className="flex items-center gap-3">
-              <span className="text-[11px] text-zinc-500 w-[70px]">Aspect Ratio</span>
-              <select
-                className="flex-1 bg-[#212121] text-zinc-300 text-xs rounded-lg px-2 py-1.5 border border-[#333] focus:outline-none nodrag"
-                value={aspectRatioIdx}
-                onChange={(e) => {
-                  setAspectRatioIdx(Number(e.target.value));
-                }}
-              >
-                {ASPECT_RATIOS.map((ar, i) => (
-                  <option key={ar.label} value={i}>{ar.label}</option>
-                ))}
-              </select>
+              <NodeLabel width={70}>Aspect Ratio</NodeLabel>
+              <NodeSelect
+                fullWidth
+                value={String(aspectRatioIdx)}
+                onValueChange={(val) => setAspectRatioIdx(Number(val))}
+                options={ASPECT_RATIOS.map((ar, i) => ({ value: String(i), label: ar.label }))}
+              />
             </div>
             {completedCrop && (
               <div className="flex items-center gap-3">
-                <span className="text-[11px] text-zinc-500 w-[70px]">Dimensions</span>
+                <NodeLabel width={70}>Dimensions</NodeLabel>
                 <div className="flex items-center gap-2 flex-1">
-                  <span className="text-[11px] text-zinc-500">W</span>
-                  <input
-                    type="number"
-                    className="text-xs text-zinc-300 bg-[#212121] rounded-lg px-2 py-1.5 border border-[#333] flex-1 text-center w-16 focus:outline-none focus:border-zinc-500 nodrag [&::-webkit-inner-spin-button]:appearance-none"
+                  <NodeLabel>W</NodeLabel>
+                  <NodeNumberInput
+                    className="flex-1"
                     value={realW}
                     min={1}
                     max={naturalSize?.w || 9999}
                     onChange={(e) => handleDimensionChange('w', Number(e.target.value))}
                   />
-                  <span className="text-[11px] text-zinc-500">H</span>
-                  <input
-                    type="number"
-                    className="text-xs text-zinc-300 bg-[#212121] rounded-lg px-2 py-1.5 border border-[#333] flex-1 text-center w-16 focus:outline-none focus:border-zinc-500 nodrag [&::-webkit-inner-spin-button]:appearance-none"
+                  <NodeLabel>H</NodeLabel>
+                  <NodeNumberInput
+                    className="flex-1"
                     value={realH}
                     min={1}
                     max={naturalSize?.h || 9999}
                     onChange={(e) => handleDimensionChange('h', Number(e.target.value))}
                   />
-                  <button
-                    className={`p-1 rounded transition-colors nodrag ${lockedRatio !== null ? 'text-zinc-300 hover:text-white' : 'text-zinc-600 hover:text-zinc-400'}`}
-                    onClick={(e) => {
-                      e.stopPropagation();
+                  <NodeIconButton
+                    onClick={() => {
                       if (lockedRatio !== null) {
                         setLockedRatio(null);
                       } else if (completedCrop && completedCrop.width > 0 && completedCrop.height > 0) {
@@ -505,9 +502,10 @@ export function CropNode(props: NodeProps) {
                       }
                     }}
                     title={lockedRatio !== null ? 'Aspect ratio locked' : 'Aspect ratio unlocked'}
+                    active={lockedRatio !== null}
                   >
                     {lockedRatio !== null ? <Link size={14} /> : <Unlink size={14} />}
-                  </button>
+                  </NodeIconButton>
                 </div>
               </div>
             )}

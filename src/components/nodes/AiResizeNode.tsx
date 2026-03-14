@@ -9,6 +9,8 @@ import { useFlowStore } from '@/store/flowStore';
 import { Scaling, Play, Loader } from 'lucide-react';
 import { ResultNavOverlay } from '@/components/nodes/ResultNavOverlay';
 import { NodeQuickActions } from './NodeQuickActions';
+import { NodeSelect, NodeLabel } from './controls';
+import { theme } from '@/lib/theme';
 
 type AspectRatio = '1:1' | '3:4' | '4:3' | '2:3' | '3:2' | '4:5' | '5:4' | '9:16' | '16:9' | '21:9';
 
@@ -188,13 +190,17 @@ export function AiResizeNode(props: NodeProps) {
       {/* Card */}
       <div
         className={`
-          bg-[#171717] rounded-[24px] border-2 border-[#212121] relative flex flex-col items-start
+          rounded-[24px] border-2 relative flex flex-col items-start
           p-4 pt-3 w-full
           drop-shadow-sm group-hover:drop-shadow-md
           ${selected ? 'border-white/30 show-labels' : ''}
           ${isRunning ? 'border-yellow-400/50' : ''}
           ${data.status === 'error' ? 'border-red-400/50' : ''}
         `}
+        style={{
+          backgroundColor: theme.surface1,
+          borderColor: selected ? undefined : isRunning ? undefined : data.status === 'error' ? undefined : theme.border1,
+        }}
       >
         {/* Header */}
         <header className="mb-2 flex h-7 items-center justify-between gap-2 self-stretch">
@@ -218,7 +224,7 @@ export function AiResizeNode(props: NodeProps) {
                   id={handle.id}
                   className="!relative !transform-none !w-[18px] !h-[18px] !rounded-full !border-2 !left-0 !top-0 !flex !items-center !justify-center"
                   style={{
-                    backgroundColor: isConnected ? color : '#171717',
+                    backgroundColor: isConnected ? color : theme.surface1,
                     borderColor: color,
                   }}
                 >
@@ -248,7 +254,7 @@ export function AiResizeNode(props: NodeProps) {
                   id={handle.id}
                   className="!relative !transform-none !w-[18px] !h-[18px] !rounded-full !border-2 !left-0 !top-0 !flex !items-center !justify-center"
                   style={{
-                    backgroundColor: isConnected ? color : '#171717',
+                    backgroundColor: isConnected ? color : theme.surface1,
                     borderColor: color,
                   }}
                 >
@@ -304,12 +310,12 @@ export function AiResizeNode(props: NodeProps) {
                   )}
                 </div>
               ) : (
-                <div className={`rounded-2xl ${isRunning ? 'shimmer' : 'bg-[#212121]'}`} style={{ aspectRatio: aspectRatio.replace(':', '/') }} />
+                <div className={`rounded-2xl ${isRunning ? 'shimmer' : ''}`} style={{ ...(!isRunning ? { backgroundColor: theme.previewBg } : {}), aspectRatio: aspectRatio.replace(':', '/') }} />
               )}
               <ResultNavOverlay nodeId={id} results={data.results} selectedResultIndex={data.selectedResultIndex || 0} />
             </div>
           ) : resultUrl ? (
-            <div className="relative group/preview bg-[#212121] rounded-2xl overflow-hidden">
+            <div className="relative group/preview rounded-2xl overflow-hidden" style={{ backgroundColor: theme.previewBg }}>
               <img src={resultUrl} alt="AI Resize result" className="w-full" />
               <ResultNavOverlay nodeId={id} results={data.results} selectedResultIndex={data.selectedResultIndex || 0} />
             </div>
@@ -338,25 +344,25 @@ export function AiResizeNode(props: NodeProps) {
                   />
                 </div>
               ) : (
-                <div className="bg-[#212121] rounded-2xl aspect-square" />
+                <div className="rounded-2xl aspect-square" style={{ backgroundColor: theme.previewBg }} />
               )}
             </>
           ) : (
-            <div className="bg-[#212121] rounded-2xl p-8 text-center aspect-square flex items-center justify-center">
+            <div className="rounded-2xl p-8 text-center aspect-square flex items-center justify-center" style={{ backgroundColor: theme.previewBg }}>
               <span className="text-zinc-500 text-sm">Connect an image</span>
             </div>
           )}
 
           {/* Aspect Ratio selector */}
-          <div className="mt-3">
-            <div className="text-[11px] text-zinc-500 mb-1">Aspect Ratio</div>
-            <select
-              className="w-full bg-[#212121] text-zinc-300 text-xs rounded-lg px-3 py-2 border border-[#333] focus:outline-none nodrag"
+          <div className="mt-3 flex items-center gap-2 self-stretch">
+            <NodeLabel>Aspect Ratio</NodeLabel>
+            <NodeSelect
+              fullWidth
               value={aspectRatio}
-              onChange={(e) => {
-                const val = e.target.value as AspectRatio;
-                setAspectRatio(val);
-                useFlowStore.getState().updateNodeSetting(id, 'aspectRatio', val);
+              onValueChange={(val) => {
+                const ar = val as AspectRatio;
+                setAspectRatio(ar);
+                useFlowStore.getState().updateNodeSetting(id, 'aspectRatio', ar);
 
                 // Add a preview placeholder so the user sees the checkerboard as a new slot
                 if (hasInput) {
@@ -365,7 +371,7 @@ export function AiResizeNode(props: NodeProps) {
                   const results = currentData?.results || [];
                   // Remove any existing preview placeholder
                   const cleaned = results.filter(r => Object.values(r)[0]?.format !== 'preview');
-                  const preview = { image: { content: '', format: 'preview', aspectRatio: val } };
+                  const preview = { image: { content: '', format: 'preview', aspectRatio: ar } };
                   store.updateNodeData(id, {
                     results: [...cleaned, preview],
                     selectedResultIndex: cleaned.length,
@@ -373,11 +379,8 @@ export function AiResizeNode(props: NodeProps) {
                   });
                 }
               }}
-            >
-              {ASPECT_RATIOS.map((r) => (
-                <option key={r} value={r}>{r}</option>
-              ))}
-            </select>
+              options={ASPECT_RATIOS.map((r) => ({ value: r, label: r }))}
+            />
           </div>
 
           {/* Error */}
@@ -394,9 +397,14 @@ export function AiResizeNode(props: NodeProps) {
                 isRunning
                   ? 'bg-yellow-900/50 text-yellow-400 cursor-wait border border-yellow-700/50'
                   : hasInput && imgNatural
-                    ? 'bg-transparent hover:bg-[#212121] text-white border border-[#292929]'
-                    : 'bg-transparent text-zinc-600 border border-[#212121] cursor-not-allowed'
+                    ? 'bg-transparent text-white'
+                    : 'bg-transparent text-zinc-600 cursor-not-allowed'
               }`}
+              style={
+                isRunning ? undefined
+                : hasInput && imgNatural ? { border: `1px solid ${theme.border2}` }
+                : { border: `1px solid ${theme.border1}` }
+              }
               disabled={!hasInput || !imgNatural || isRunning}
               onClick={(e) => { e.stopPropagation(); handleRun(); }}
             >

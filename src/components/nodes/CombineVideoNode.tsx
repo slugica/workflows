@@ -5,9 +5,11 @@ import { Handle, Position, useEdges, useNodes, type NodeProps } from '@xyflow/re
 import { FlowNodeData, HANDLE_COLORS, resolveFileHandleColor } from '@/lib/types';
 import { ensureRemoteUrl, executeRendi } from '@/lib/executeNode';
 import { useFlowStore } from '@/store/flowStore';
-import { Film, Play, Loader, ChevronDown } from 'lucide-react';
+import { Film, Play, Loader } from 'lucide-react';
+import { NodeSelect, NodeLabel } from './controls';
 import { ResultNavOverlay } from '@/components/nodes/ResultNavOverlay';
 import { NodeQuickActions } from './NodeQuickActions';
+import { theme } from '@/lib/theme';
 
 const HANDLE_SIZE = 18;
 const HEADER_OFFSET = 68;
@@ -338,14 +340,18 @@ export function CombineVideoNode(props: NodeProps) {
       {/* Card */}
       <div
         className={`
-          bg-[#171717] rounded-[24px] border-2 border-[#212121] relative flex flex-col items-start
+          rounded-[24px] border-2 relative flex flex-col items-start
           p-4 pt-3 w-full
           drop-shadow-sm group-hover:drop-shadow-md
           ${selected ? 'border-white/30 show-labels' : ''}
           ${isRunning ? 'border-yellow-400/50' : ''}
           ${data.status === 'error' ? 'border-red-400/50' : ''}
         `}
-        style={minCardHeight ? { minHeight: minCardHeight } : undefined}
+        style={{
+          backgroundColor: theme.surface1,
+          borderColor: selected ? undefined : isRunning ? undefined : data.status === 'error' ? undefined : theme.border1,
+          ...(minCardHeight ? { minHeight: minCardHeight } : {}),
+        }}
       >
         {/* Header */}
         <header className="mb-2 flex h-7 items-center justify-between gap-2 self-stretch">
@@ -374,7 +380,7 @@ export function CombineVideoNode(props: NodeProps) {
                   id={handle.id}
                   className="!relative !transform-none !w-[18px] !h-[18px] !rounded-full !border-2 !left-0 !top-0 !flex !items-center !justify-center"
                   style={{
-                    backgroundColor: isConnected ? color : '#171717',
+                    backgroundColor: isConnected ? color : theme.surface1,
                     borderColor: color,
                   }}
                 >
@@ -404,7 +410,7 @@ export function CombineVideoNode(props: NodeProps) {
                   id={handle.id}
                   className="!relative !transform-none !w-[18px] !h-[18px] !rounded-full !border-2 !left-0 !top-0 !flex !items-center !justify-center"
                   style={{
-                    backgroundColor: isConnected ? color : '#171717',
+                    backgroundColor: isConnected ? color : theme.surface1,
                     borderColor: color,
                   }}
                 >
@@ -424,12 +430,12 @@ export function CombineVideoNode(props: NodeProps) {
         <div className="self-stretch">
           {/* Preview area */}
           {isPlaceholder ? (
-            <div className="relative bg-[#212121] rounded-2xl overflow-hidden group/preview">
+            <div className="relative rounded-2xl overflow-hidden group/preview" style={{ backgroundColor: theme.previewBg }}>
               <ResultNavOverlay nodeId={id} results={data.results} selectedResultIndex={data.selectedResultIndex || 0} />
               <div className="shimmer w-full aspect-video" />
             </div>
           ) : resultUrl ? (
-            <div className="relative bg-[#212121] rounded-2xl overflow-hidden group/preview">
+            <div className="relative rounded-2xl overflow-hidden group/preview" style={{ backgroundColor: theme.previewBg }}>
               <ResultNavOverlay nodeId={id} results={data.results} selectedResultIndex={data.selectedResultIndex || 0} />
               <video
                 key={resultUrl}
@@ -441,7 +447,7 @@ export function CombineVideoNode(props: NodeProps) {
               />
             </div>
           ) : (
-            <div className="aspect-video bg-[#212121] rounded-2xl checkerboard flex items-center justify-center">
+            <div className="aspect-video rounded-2xl checkerboard flex items-center justify-center" style={{ backgroundColor: theme.previewBg }}>
               <span className="text-zinc-500 text-sm">
                 {connectedVideos.length < 2 ? 'Connect at least 2 videos' : 'Ready to combine'}
               </span>
@@ -449,24 +455,18 @@ export function CombineVideoNode(props: NodeProps) {
           )}
 
           {/* Transition dropdown */}
-          <div className="mt-3">
-            <div className="text-[11px] text-zinc-500 mb-1">Transition</div>
-            <div className="relative">
-              <select
-                className="w-full bg-[#212121] text-zinc-300 text-xs rounded-lg px-3 py-2 border border-[#333] focus:outline-none appearance-none nodrag pr-8"
-                value={transition}
-                onChange={(e) => {
-                  const val = e.target.value as TransitionType;
-                  setTransition(val);
-                  useFlowStore.getState().updateNodeSetting(id, 'transition', val);
-                }}
-              >
-                {TRANSITIONS.map((t) => (
-                  <option key={t.value} value={t.value}>{t.label}</option>
-                ))}
-              </select>
-              <ChevronDown size={12} className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-500 pointer-events-none" />
-            </div>
+          <div className="mt-3 flex items-center gap-2">
+            <NodeLabel>Transition</NodeLabel>
+            <NodeSelect
+              fullWidth
+              value={transition}
+              onValueChange={(val) => {
+                const t = val as TransitionType;
+                setTransition(t);
+                useFlowStore.getState().updateNodeSetting(id, 'transition', t);
+              }}
+              options={TRANSITIONS}
+            />
           </div>
 
           {/* Error */}
@@ -483,9 +483,10 @@ export function CombineVideoNode(props: NodeProps) {
                 isRunning
                   ? 'bg-yellow-900/50 text-yellow-400 cursor-wait border border-yellow-700/50'
                   : canRun
-                    ? 'bg-transparent hover:bg-[#212121] text-white border border-[#292929]'
-                    : 'bg-transparent text-zinc-600 border border-[#212121] cursor-not-allowed'
+                    ? 'bg-transparent text-white'
+                    : 'bg-transparent text-zinc-600 cursor-not-allowed'
               }`}
+              style={isRunning ? undefined : { border: `1px solid ${canRun ? theme.border2 : theme.border1}` }}
               disabled={!canRun}
               onClick={(e) => { e.stopPropagation(); handleRun(); }}
             >

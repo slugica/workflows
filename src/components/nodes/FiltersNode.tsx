@@ -5,9 +5,11 @@ import { Handle, Position, useEdges, useNodes, type NodeProps } from '@xyflow/re
 import { FlowNodeData, HANDLE_COLORS, resolveFileHandleColor } from '@/lib/types';
 import { resolveInput } from '@/lib/resolveInput';
 import { useFlowStore } from '@/store/flowStore';
-import { SlidersHorizontal, RotateCcw } from 'lucide-react';
+import { SlidersHorizontal } from 'lucide-react';
+import { NodeSlider, NodeNumberInput, NodeLabel, NodeResetButton } from './controls';
 import { VideoPreviewPlayer } from './VideoPreviewPlayer';
 import { NodeQuickActions } from './NodeQuickActions';
+import { theme } from '@/lib/theme';
 
 interface FilterValues {
   exposure: number;    // -100..+100, neutral 0
@@ -214,11 +216,15 @@ export function FiltersNode(props: NodeProps) {
       {/* Card */}
       <div
         className={`
-          bg-[#171717] rounded-[24px] border-2 border-[#212121] relative flex flex-col items-start
+          rounded-[24px] border-2 relative flex flex-col items-start
           p-4 pt-3 w-full
           drop-shadow-sm group-hover:drop-shadow-md
           ${selected ? 'border-white/30 show-labels' : ''}
         `}
+        style={{
+          backgroundColor: theme.surface1,
+          borderColor: selected ? undefined : theme.border1,
+        }}
       >
         {/* Header */}
         <header className="mb-2 flex h-7 items-center justify-between gap-2 self-stretch">
@@ -242,7 +248,7 @@ export function FiltersNode(props: NodeProps) {
                   id={handle.id}
                   className="!relative !transform-none !w-[18px] !h-[18px] !rounded-full !border-2 !left-0 !top-0 !flex !items-center !justify-center"
                   style={{
-                    backgroundColor: isConnected ? color : '#171717',
+                    backgroundColor: isConnected ? color : theme.surface1,
                     borderColor: color,
                   }}
                 >
@@ -272,7 +278,7 @@ export function FiltersNode(props: NodeProps) {
                   id={handle.id}
                   className="!relative !transform-none !w-[18px] !h-[18px] !rounded-full !border-2 !left-0 !top-0 !flex !items-center !justify-center"
                   style={{
-                    backgroundColor: isConnected ? color : '#171717',
+                    backgroundColor: isConnected ? color : theme.surface1,
                     borderColor: color,
                   }}
                 >
@@ -317,8 +323,8 @@ export function FiltersNode(props: NodeProps) {
 
               {/* Preview */}
               <div
-                className="relative bg-[#212121] rounded-2xl overflow-hidden"
-                style={contentSize ? { width: contentSize.w, height: contentSize.h } : undefined}
+                className="relative rounded-2xl overflow-hidden"
+                style={{ ...(contentSize ? { width: contentSize.w, height: contentSize.h } : {}), backgroundColor: theme.previewBg }}
               >
                 {isVideo ? (
                   <VideoPreviewPlayer
@@ -336,37 +342,38 @@ export function FiltersNode(props: NodeProps) {
               </div>
             </>
           ) : (
-            <div className="aspect-square bg-[#212121] rounded-2xl checkerboard" />
+            <div className="aspect-square rounded-2xl checkerboard" style={{ backgroundColor: theme.previewBg }} />
           )}
 
           {/* Reset */}
           <div className="mt-2 flex justify-end self-stretch">
-            <button
-              className="flex items-center gap-1 text-[11px] text-zinc-500 hover:text-zinc-300 transition-colors nodrag"
-              onClick={(e) => { e.stopPropagation(); handleReset(); }}
-            >
-              <RotateCcw size={11} /> Reset
-            </button>
+            <NodeResetButton onClick={handleReset} />
           </div>
 
           {/* Sliders */}
           <div className="mt-1 space-y-2 self-stretch">
             {FILTER_DEFS.map((def) => (
               <div key={def.key} className="flex items-center gap-3">
-                <span className="text-[11px] text-zinc-500 w-[80px] shrink-0">{def.label}</span>
-                <input
-                  type="range"
+                <NodeLabel width={80}>{def.label}</NodeLabel>
+                <NodeSlider
                   min={-100}
                   max={100}
                   step={1}
                   value={filters[def.key]}
                   onChange={(e) => setFilters((f) => ({ ...f, [def.key]: Number(e.target.value) }))}
                   onPointerUp={() => setCommitted({ ...filters })}
-                  className="flex-1 accent-white h-1 nodrag"
                 />
-                <span className="text-[11px] text-zinc-400 w-[32px] text-right tabular-nums">
-                  {filters[def.key]}
-                </span>
+                <NodeNumberInput
+                  variant="narrow"
+                  value={filters[def.key]}
+                  min={-100}
+                  max={100}
+                  onChange={(e) => {
+                    const val = Number(e.target.value);
+                    setFilters((f) => ({ ...f, [def.key]: val }));
+                    setCommitted((c) => ({ ...c, [def.key]: val }));
+                  }}
+                />
               </div>
             ))}
           </div>

@@ -101,3 +101,60 @@ body {
 .react-flow__pane.selection {
   cursor: default !important;
 }
+
+/* Shared slider styling — matches Imagine.art */
+.node-slider {
+  -webkit-appearance: none;
+  appearance: none;
+  height: 4px;
+  border-radius: 9999px;
+  outline: none;
+  cursor: pointer;
+}
+
+.node-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: white;
+  cursor: pointer;
+  box-shadow: 0 0 2px rgba(0,0,0,0.3);
+}
+
+.node-slider::-moz-range-thumb {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: white;
+  cursor: pointer;
+  border: none;
+  box-shadow: 0 0 2px rgba(0,0,0,0.3);
+}
+
+/* NodeSelect — hover, open state, chevron animation */
+.node-select-trigger:hover {
+  border-color: #555 !important;
+}
+
+.node-select-trigger[data-state="open"] {
+  border-color: rgba(255, 255, 255, 0.5) !important;
+}
+
+.node-select-chevron {
+  transition: transform 0.2s ease;
+}
+
+.node-select-trigger[data-state="open"] .node-select-chevron {
+  transform: rotate(180deg);
+}
+
+/* Radix Select popup entrance animation */
+@keyframes selectFadeIn {
+  from { opacity: 0; transform: scale(0.95) translateY(-4px); }
+  to { opacity: 1; transform: scale(1) translateY(0); }
+}
+
+[data-radix-select-content] {
+  animation: selectFadeIn 0.15s ease-out;
+}

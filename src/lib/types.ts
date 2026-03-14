@@ -54,6 +54,24 @@ export const HANDLE_COLORS: Record<HandleDataType, string> = {
 };
 
 /** Detect media color from a node's settings/results. Returns null if unknown. */
+/** Detect the actual media type of a node's content at runtime */
+export function detectMediaType(nodeData: FlowNodeData): 'image' | 'video' | 'audio' | null {
+  const ft = nodeData.settings?.fileType as string | undefined;
+  if (ft?.startsWith('video/')) return 'video';
+  if (ft?.startsWith('image/')) return 'image';
+  if (ft?.startsWith('audio/')) return 'audio';
+  if (nodeData.results?.length) {
+    const result = nodeData.results[nodeData.selectedResultIndex || 0];
+    if (result) {
+      const entry = Object.values(result)[0];
+      if (entry?.format === 'video') return 'video';
+      if (entry?.format === 'image') return 'image';
+      if (entry?.format === 'audio') return 'audio';
+    }
+  }
+  return null;
+}
+
 function detectMediaColor(nodeData: FlowNodeData): string | null {
   const ft = nodeData.settings.fileType as string | undefined;
   if (ft?.startsWith('video/')) return HANDLE_COLORS.video;

@@ -6,7 +6,9 @@ import { FlowNodeData, HANDLE_COLORS } from '@/lib/types';
 import { resolveInput } from '@/lib/resolveInput';
 import { useFlowStore } from '@/store/flowStore';
 import { Film, Play, Pause, Volume2, VolumeX } from 'lucide-react';
+import { NodeNumberInput, NodeLabel } from './controls';
 import { QuickActionsBar } from '@/components/nodes/QuickActionsBar';
+import { theme } from '@/lib/theme';
 
 export function ExtractFrameNode(props: NodeProps) {
   const { id, selected } = props;
@@ -115,7 +117,7 @@ export function ExtractFrameNode(props: NodeProps) {
 
     const ctx = tc.getContext('2d')!;
     ctx.scale(dpr, dpr);
-    ctx.fillStyle = '#2a2a2a';
+    ctx.fillStyle = theme.surfaceHover;
     ctx.fillRect(0, 0, containerW, STRIP_H);
 
     let drawn = 0;
@@ -254,11 +256,15 @@ export function ExtractFrameNode(props: NodeProps) {
       {/* Card */}
       <div
         className={`
-          bg-[#171717] rounded-[24px] border-2 border-[#212121] relative flex flex-col items-start
+          rounded-[24px] border-2 relative flex flex-col items-start
           p-4 pt-3 w-full
           drop-shadow-sm group-hover:drop-shadow-md
           ${selected ? 'border-white/30 show-labels' : ''}
         `}
+        style={{
+          backgroundColor: theme.surface1,
+          borderColor: selected ? undefined : theme.border1,
+        }}
       >
         {/* Header */}
         <header className="mb-2 flex h-7 items-center justify-between gap-2 self-stretch">
@@ -281,7 +287,7 @@ export function ExtractFrameNode(props: NodeProps) {
                   id={handle.id}
                   className="!relative !transform-none !w-[18px] !h-[18px] !rounded-full !border-2 !left-0 !top-0 !flex !items-center !justify-center"
                   style={{
-                    backgroundColor: isConnected ? HANDLE_COLORS[handle.type] : '#171717',
+                    backgroundColor: isConnected ? HANDLE_COLORS[handle.type] : theme.surface1,
                     borderColor: HANDLE_COLORS[handle.type],
                   }}
                 >
@@ -310,7 +316,7 @@ export function ExtractFrameNode(props: NodeProps) {
                   id={handle.id}
                   className="!relative !transform-none !w-[18px] !h-[18px] !rounded-full !border-2 !left-0 !top-0 !flex !items-center !justify-center"
                   style={{
-                    backgroundColor: isConnected ? HANDLE_COLORS[handle.type] : '#171717',
+                    backgroundColor: isConnected ? HANDLE_COLORS[handle.type] : theme.surface1,
                     borderColor: HANDLE_COLORS[handle.type],
                   }}
                 >
@@ -331,7 +337,7 @@ export function ExtractFrameNode(props: NodeProps) {
           {inputUrl ? (
             <div className="flex flex-col gap-3">
               {/* Video preview */}
-              <div className="bg-[#212121] rounded-2xl overflow-hidden relative">
+              <div className="rounded-2xl overflow-hidden relative" style={{ backgroundColor: theme.previewBg }}>
                 <video
                   ref={videoRef}
                   src={inputUrl}
@@ -372,7 +378,8 @@ export function ExtractFrameNode(props: NodeProps) {
               <div className="flex flex-col gap-1.5">
                 <div
                   ref={timelineRef}
-                  className="relative h-[40px] bg-[#212121] rounded-lg overflow-hidden cursor-pointer nodrag nopan"
+                  className="relative h-[40px] rounded-lg overflow-hidden cursor-pointer nodrag nopan"
+                  style={{ backgroundColor: theme.previewBg }}
                   onMouseDown={(e) => {
                     e.stopPropagation();
                     seekToTime(getTimeFromMouse(e));
@@ -400,10 +407,9 @@ export function ExtractFrameNode(props: NodeProps) {
                 {/* Frame & Timecode inputs */}
                 <div className="flex items-center gap-3 nodrag">
                   <div className="flex items-center gap-1.5">
-                    <span className="text-[11px] text-zinc-500">Frame</span>
-                    <input
-                      type="number"
-                      className="w-[60px] bg-[#212121] border border-[#333] rounded-md px-2 py-1 text-[11px] text-white text-center outline-none focus:border-zinc-500"
+                    <NodeLabel>Frame</NodeLabel>
+                    <NodeNumberInput
+                      variant="narrow"
                       value={currentFrame}
                       min={1}
                       max={totalFrames}
@@ -415,7 +421,7 @@ export function ExtractFrameNode(props: NodeProps) {
                   </div>
                   <div className="flex items-center gap-1.5">
                     <span className="text-[11px] text-zinc-500">Timecode</span>
-                    <div className="bg-[#212121] border border-[#333] rounded-md px-2 py-1 text-[11px] text-white">
+                    <div className="border rounded-md px-2 py-1 text-[11px] text-white" style={{ backgroundColor: theme.surface2, borderColor: theme.border3 }}>
                       {formatTimecode(currentTime)}
                     </div>
                   </div>
@@ -423,7 +429,7 @@ export function ExtractFrameNode(props: NodeProps) {
               </div>
             </div>
           ) : (
-            <div className="aspect-video bg-[#212121] rounded-2xl checkerboard flex items-center justify-center">
+            <div className="aspect-video rounded-2xl checkerboard flex items-center justify-center" style={{ backgroundColor: theme.previewBg }}>
               <span className="text-zinc-500 text-sm">Connect a video</span>
             </div>
           )}

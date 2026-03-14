@@ -6,7 +6,9 @@ import { FlowNodeData, HANDLE_COLORS, resolveFileHandleColor } from '@/lib/types
 import { resolveInput } from '@/lib/resolveInput';
 import { useFlowStore } from '@/store/flowStore';
 import { Upload, Loader } from 'lucide-react';
+import { NodeSelect, NodeLabel } from './controls';
 import { executeExportNode } from '@/lib/executeNode';
+import { theme } from '@/lib/theme';
 
 const IMAGE_FILE_TYPES = [
   { label: 'PNG', value: 'png', mime: 'image/png' },
@@ -201,11 +203,15 @@ export function ExportNode(props: NodeProps) {
       {/* Card */}
       <div
         className={`
-          bg-[#171717] rounded-[24px] border-2 border-[#212121] relative flex flex-col items-start
+          rounded-[24px] border-2 relative flex flex-col items-start
           p-4 pt-3 w-full
           drop-shadow-sm group-hover:drop-shadow-md
           ${selected ? 'border-white/30 show-labels' : ''}
         `}
+        style={{
+          backgroundColor: theme.surface1,
+          borderColor: selected ? undefined : theme.border1,
+        }}
       >
         {/* Header */}
         <header className="mb-2 flex h-7 items-center justify-between gap-2 self-stretch">
@@ -230,7 +236,7 @@ export function ExportNode(props: NodeProps) {
                 id={handle.id}
                 className="!relative !transform-none !w-[18px] !h-[18px] !rounded-full !border-2 !left-0 !top-0 !flex !items-center !justify-center"
                 style={{
-                  backgroundColor: isConnected ? color : '#171717',
+                  backgroundColor: isConnected ? color : theme.surface1,
                   borderColor: color,
                 }}
               >
@@ -248,7 +254,7 @@ export function ExportNode(props: NodeProps) {
         {/* Content */}
         <div className="self-stretch">
           {inputUrl ? (
-            <div className="rounded-2xl bg-[#212121]/50 p-4 space-y-3">
+            <div className="rounded-2xl p-4 space-y-3" style={{ backgroundColor: `${theme.surface2}80` }}>
               {/* Hidden element to get natural dimensions */}
               {isVideo ? (
                 <video
@@ -270,17 +276,14 @@ export function ExportNode(props: NodeProps) {
 
               {/* File type */}
               <div className="flex flex-col gap-1">
-                <label className="text-[11px] text-zinc-500">File type</label>
-                <select
-                  className="w-full bg-[#171717] text-zinc-300 text-xs rounded-lg px-3 py-2 border border-[#333] focus:outline-none nodrag"
+                <NodeLabel>File type</NodeLabel>
+                <NodeSelect
+                  fullWidth
                   value={effectiveFileType}
-                  onChange={(e) => setFileType(e.target.value)}
+                  onValueChange={setFileType}
                   disabled={isVideo}
-                >
-                  {fileTypes.map((ft) => (
-                    <option key={ft.value} value={ft.value}>{ft.label}</option>
-                  ))}
-                </select>
+                  options={fileTypes}
+                />
               </div>
 
               {/* Scale (image only) */}
@@ -293,9 +296,13 @@ export function ExportNode(props: NodeProps) {
                         key={s}
                         className={`h-7 rounded-lg text-xs font-medium border transition-colors nodrag ${
                           scale === s
-                            ? 'border-white/40 text-white bg-[#212121]'
-                            : 'border-[#333] text-zinc-400 hover:border-zinc-500'
+                            ? 'border-white/40 text-white'
+                            : 'text-zinc-400 hover:border-zinc-500'
                         }`}
+                        style={{
+                          backgroundColor: scale === s ? theme.surface2 : 'transparent',
+                          borderColor: scale === s ? undefined : theme.border3,
+                        }}
                         onClick={(e) => {
                           e.stopPropagation();
                           setScale(s);
@@ -331,9 +338,10 @@ export function ExportNode(props: NodeProps) {
               <button
                 className={`w-full h-10 rounded-2xl text-sm font-medium transition-colors nodrag ${
                   exporting
-                    ? 'bg-[#333] text-zinc-400 cursor-wait'
+                    ? 'text-zinc-400 cursor-wait'
                     : 'bg-white text-black hover:bg-zinc-200'
                 }`}
+                style={exporting ? { backgroundColor: theme.surfaceActive } : undefined}
                 disabled={exporting || (!isVideo && imgSize.w === 0)}
                 onClick={(e) => {
                   e.stopPropagation();
@@ -350,7 +358,7 @@ export function ExportNode(props: NodeProps) {
               </button>
             </div>
           ) : (
-            <div className="rounded-2xl bg-[#212121]/50 p-6 flex flex-col items-center justify-center gap-2">
+            <div className="rounded-2xl p-6 flex flex-col items-center justify-center gap-2" style={{ backgroundColor: `${theme.surface2}80` }}>
               <Upload size={24} className="text-zinc-600" />
               <span className="text-zinc-500 text-xs text-center">No input connected</span>
               <span className="text-zinc-600 text-[10px] text-center">Connect a node to the input to export your content</span>

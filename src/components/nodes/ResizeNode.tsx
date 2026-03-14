@@ -8,6 +8,8 @@ import { useFlowStore } from '@/store/flowStore';
 import { Scaling, Link, Unlink } from 'lucide-react';
 import { VideoPreviewPlayer } from './VideoPreviewPlayer';
 import { NodeQuickActions } from './NodeQuickActions';
+import { NodeNumberInput, NodeIconButton, NodeControlsRow, NodeLabel } from './controls';
+import { theme } from '@/lib/theme';
 
 export function ResizeNode(props: NodeProps) {
   const { id, selected } = props;
@@ -153,11 +155,15 @@ export function ResizeNode(props: NodeProps) {
       {/* Card */}
       <div
         className={`
-          bg-[#171717] rounded-[24px] border-2 border-[#212121] relative flex flex-col items-start
+          rounded-[24px] border-2 relative flex flex-col items-start
           p-4 pt-3 w-full
           drop-shadow-sm group-hover:drop-shadow-md
           ${selected ? 'border-white/30 show-labels' : ''}
         `}
+        style={{
+          backgroundColor: theme.surface1,
+          borderColor: selected ? undefined : theme.border1,
+        }}
       >
         {/* Header */}
         <header className="mb-2 flex h-7 items-center justify-between gap-2 self-stretch">
@@ -181,7 +187,7 @@ export function ResizeNode(props: NodeProps) {
                   id={handle.id}
                   className="!relative !transform-none !w-[18px] !h-[18px] !rounded-full !border-2 !left-0 !top-0 !flex !items-center !justify-center"
                   style={{
-                    backgroundColor: isConnected ? color : '#171717',
+                    backgroundColor: isConnected ? color : theme.surface1,
                     borderColor: color,
                   }}
                 >
@@ -211,7 +217,7 @@ export function ResizeNode(props: NodeProps) {
                   id={handle.id}
                   className="!relative !transform-none !w-[18px] !h-[18px] !rounded-full !border-2 !left-0 !top-0 !flex !items-center !justify-center"
                   style={{
-                    backgroundColor: isConnected ? color : '#171717',
+                    backgroundColor: isConnected ? color : theme.surface1,
                     borderColor: color,
                   }}
                 >
@@ -259,8 +265,8 @@ export function ResizeNode(props: NodeProps) {
 
               {/* Preview */}
               <div
-                className="relative bg-[#212121] rounded-2xl overflow-hidden"
-                style={contentSize ? { width: contentSize.w, height: contentSize.h } : undefined}
+                className="relative rounded-2xl overflow-hidden"
+                style={{ ...(contentSize ? { width: contentSize.w, height: contentSize.h } : {}), backgroundColor: theme.previewBg }}
               >
                 {resultFormat === 'video' || isVideo ? (
                   <VideoPreviewPlayer
@@ -277,37 +283,32 @@ export function ResizeNode(props: NodeProps) {
               </div>
 
               {/* Controls */}
-              <div className="mt-3 flex items-center gap-2 self-stretch">
-                <span className="text-[11px] text-zinc-500">W</span>
-                <input
-                  type="number"
-                  className="text-xs text-zinc-300 bg-[#212121] rounded-lg px-2 py-1.5 border border-[#333] flex-1 text-center w-16 focus:outline-none focus:border-zinc-500 nodrag [&::-webkit-inner-spin-button]:appearance-none"
+              <NodeControlsRow>
+                <NodeLabel>W</NodeLabel>
+                <NodeNumberInput
                   value={targetW}
                   min={1}
                   onChange={(e) => handleWChange(Number(e.target.value))}
+                  className="flex-1"
                 />
-                <span className="text-[11px] text-zinc-500">H</span>
-                <input
-                  type="number"
-                  className="text-xs text-zinc-300 bg-[#212121] rounded-lg px-2 py-1.5 border border-[#333] flex-1 text-center w-16 focus:outline-none focus:border-zinc-500 nodrag [&::-webkit-inner-spin-button]:appearance-none"
+                <NodeLabel>H</NodeLabel>
+                <NodeNumberInput
                   value={targetH}
                   min={1}
                   onChange={(e) => handleHChange(Number(e.target.value))}
+                  className="flex-1"
                 />
-                <button
-                  className={`p-1 rounded transition-colors nodrag ${locked ? 'text-zinc-300 hover:text-white' : 'text-zinc-600 hover:text-zinc-400'}`}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setLocked(!locked);
-                  }}
+                <NodeIconButton
+                  onClick={() => setLocked(!locked)}
                   title={locked ? 'Aspect ratio locked' : 'Aspect ratio unlocked'}
+                  active={locked}
                 >
                   {locked ? <Link size={14} /> : <Unlink size={14} />}
-                </button>
-              </div>
+                </NodeIconButton>
+              </NodeControlsRow>
             </div>
           ) : (
-            <div className="h-[320px] bg-[#212121] rounded-2xl checkerboard flex items-center justify-center">
+            <div className="h-[320px] rounded-2xl checkerboard flex items-center justify-center" style={{ backgroundColor: theme.previewBg }}>
               <span className="text-zinc-500 text-sm">Connect a file input</span>
             </div>
           )}

@@ -6,9 +6,11 @@ import * as Slider from '@radix-ui/react-slider';
 import { FlowNodeData, HANDLE_COLORS, resolveFileHandleColor } from '@/lib/types';
 import { resolveInput } from '@/lib/resolveInput';
 import { useFlowStore } from '@/store/flowStore';
-import { SlidersHorizontal, RotateCcw } from 'lucide-react';
+import { SlidersHorizontal } from 'lucide-react';
+import { NodeSelect, NodeNumberInput, NodeResetButton } from './controls';
 import { VideoPreviewPlayer } from './VideoPreviewPlayer';
 import { NodeQuickActions } from './NodeQuickActions';
+import { theme } from '@/lib/theme';
 
 type Channel = 'rgb' | 'red' | 'green' | 'blue';
 
@@ -113,7 +115,7 @@ function drawHistogram(canvas: HTMLCanvasElement, imageData: ImageData, channel:
 }
 
 const thumbClass = 'block w-3 h-3 bg-white rounded-full border-2 border-zinc-400 cursor-ew-resize focus:outline-none focus:border-white';
-const trackClass = 'relative flex-1 h-1 bg-[#333] rounded-full';
+const trackClass = 'relative flex-1 h-1 bg-[#333333] rounded-full';
 const rangeClass = 'absolute h-full bg-zinc-500 rounded-full';
 
 const valToPercent = (v: number) => (v / 255) * 100;
@@ -186,7 +188,7 @@ function InputLevelsSlider({
       onPointerMove={handlePointerMove}
       onPointerUp={handlePointerUp}
     >
-      <div ref={trackRef} className="absolute inset-x-0 h-1 bg-[#333] rounded-full">
+      <div ref={trackRef} className="absolute inset-x-0 h-1 bg-[#333333] rounded-full">
         <div
           className="absolute h-full bg-zinc-500 rounded-full"
           style={{ left: `${valToPercent(shadowIn)}%`, right: `${100 - valToPercent(highlightIn)}%` }}
@@ -222,6 +224,8 @@ export function LevelsNode(props: NodeProps) {
   const edges = useEdges();
   const imgRef = useRef<HTMLImageElement>(null);
   const histCanvasRef = useRef<HTMLCanvasElement>(null);
+  const histTrackRef = useRef<HTMLDivElement>(null);
+  const histDragRef = useRef<'shadow' | 'gamma' | 'highlight' | null>(null);
 
   const connectedHandles = useMemo(() => {
     const set = new Set<string>();
@@ -470,7 +474,7 @@ export function LevelsNode(props: NodeProps) {
   return (
     <NodeQuickActions nodeId={id} selected={selected} data={data}
       className="group relative flex flex-col items-center gap-1"
-      style={{ width: contentSize ? contentSize.w + 36 : 480 }}
+      style={{ width: contentSize ? contentSize.w + 36 : theme.nodeWidth }}
       onClick={() => selectNode(id)}
     >
       {/* Top info bar */}
@@ -489,11 +493,15 @@ export function LevelsNode(props: NodeProps) {
       {/* Card */}
       <div
         className={`
-          bg-[#171717] rounded-[24px] border-2 border-[#212121] relative flex flex-col items-start
+          rounded-[24px] border-2 relative flex flex-col items-start
           p-4 pt-3 w-full
           drop-shadow-sm group-hover:drop-shadow-md
           ${selected ? 'border-white/30 show-labels' : ''}
         `}
+        style={{
+          backgroundColor: theme.surface1,
+          borderColor: selected ? undefined : theme.border1,
+        }}
       >
         {/* Header */}
         <header className="mb-2 flex h-7 items-center justify-between gap-2 self-stretch">
@@ -517,7 +525,7 @@ export function LevelsNode(props: NodeProps) {
                   id={handle.id}
                   className="!relative !transform-none !w-[18px] !h-[18px] !rounded-full !border-2 !left-0 !top-0 !flex !items-center !justify-center"
                   style={{
-                    backgroundColor: isConnected ? color : '#171717',
+                    backgroundColor: isConnected ? color : theme.surface1,
                     borderColor: color,
                   }}
                 >
@@ -542,7 +550,7 @@ export function LevelsNode(props: NodeProps) {
                   id={handle.id}
                   className="!relative !transform-none !w-[18px] !h-[18px] !rounded-full !border-2 !left-0 !top-0 !flex !items-center !justify-center"
                   style={{
-                    backgroundColor: isConnected ? color : '#171717',
+                    backgroundColor: isConnected ? color : theme.surface1,
                     borderColor: color,
                   }}
                 >
@@ -565,7 +573,7 @@ export function LevelsNode(props: NodeProps) {
               )}
 
               {/* Preview area */}
-              <div className="relative bg-[#212121] rounded-2xl overflow-hidden" style={contentSize ? { width: contentSize.w, height: contentSize.h } : undefined}>
+              <div className="relative rounded-2xl overflow-hidden" style={{ ...(contentSize ? { width: contentSize.w, height: contentSize.h } : {}), backgroundColor: theme.previewBg }}>
                 {isVideo ? (
                   <VideoPreviewPlayer
                     src={inputUrl}
@@ -588,37 +596,62 @@ export function LevelsNode(props: NodeProps) {
               </div>
             </>
           ) : (
-            <div className="aspect-square bg-[#212121] rounded-2xl checkerboard" />
+            <div className="aspect-square rounded-2xl checkerboard" style={{ backgroundColor: theme.previewBg }} />
           )}
 
           {/* Channel selector + Reset */}
           <div className="mt-3 flex items-center gap-2 self-stretch">
-            <select
-              className="flex-1 bg-[#212121] text-zinc-300 text-xs rounded-lg px-3 py-2 border border-[#333] focus:outline-none nodrag"
-              value={channel}
-              onChange={(e) => setChannel(e.target.value as Channel)}
-            >
-              {CHANNELS.map((ch) => (
-                <option key={ch.value} value={ch.value}>{ch.label}</option>
-              ))}
-            </select>
-            <button
-              className="p-2 rounded-lg border border-[#333] text-zinc-500 hover:text-zinc-300 transition-colors nodrag"
-              onClick={(e) => { e.stopPropagation(); handleReset(); }}
-              title="Reset channel"
-            >
-              <RotateCcw size={14} />
-            </button>
+            <NodeSelect fullWidth value={channel} onValueChange={(val) => setChannel(val as Channel)} options={CHANNELS} />
+            <NodeResetButton onClick={handleReset} />
           </div>
 
-          {/* Histogram with indicator lines */}
-          <div className="mt-2 self-stretch relative">
-            <canvas ref={histCanvasRef} width={256} height={48} className="w-full h-12 rounded bg-[#212121] border border-[#333]" />
-            {/* Vertical indicator lines from thumbs */}
-            <div className="absolute inset-0 pointer-events-none" style={{ margin: '1px' }}>
-              <div className="absolute top-0 bottom-0 w-px bg-white/50" style={{ left: `${(levels.shadowIn / 255) * 100}%` }} />
-              <div className="absolute top-0 bottom-0 w-px bg-white/30" style={{ left: `${(gammaSliderPos / 255) * 100}%` }} />
-              <div className="absolute top-0 bottom-0 w-px bg-white/50" style={{ left: `${(levels.highlightIn / 255) * 100}%` }} />
+          {/* Histogram with draggable indicator lines */}
+          <div
+            className="mt-2 self-stretch relative nodrag select-none touch-none"
+            onPointerMove={(e) => {
+              if (!histDragRef.current || !histTrackRef.current) return;
+              const rect = histTrackRef.current.getBoundingClientRect();
+              const pct = ((e.clientX - rect.left) / rect.width) * 100;
+              const val = percentToVal(pct);
+              if (histDragRef.current === 'shadow') {
+                setLevels((l) => ({ ...l, shadowIn: Math.min(val, l.highlightIn - 1) }));
+              } else if (histDragRef.current === 'highlight') {
+                setLevels((l) => ({ ...l, highlightIn: Math.max(val, l.shadowIn + 1) }));
+              } else {
+                setLevels((l) => {
+                  const clamped = Math.max(l.shadowIn + 1, Math.min(l.highlightIn - 1, val));
+                  return { ...l, gamma: sliderToGamma(clamped, l.shadowIn, l.highlightIn) };
+                });
+              }
+            }}
+            onPointerUp={() => { if (histDragRef.current) { histDragRef.current = null; commitLevels(); } }}
+          >
+            <canvas ref={histCanvasRef} width={256} height={48} className="w-full h-12 rounded-xl border-none" style={{ backgroundColor: theme.surface2 }} />
+            <div ref={histTrackRef} className="absolute inset-0" style={{ margin: '1px' }}>
+              {/* Shadow line */}
+              <div
+                className="absolute top-0 bottom-0 cursor-ew-resize"
+                style={{ left: `${(levels.shadowIn / 255) * 100}%`, width: 7, transform: 'translateX(-3px)' }}
+                onPointerDown={(e) => { e.preventDefault(); e.stopPropagation(); histDragRef.current = 'shadow'; (e.target as HTMLElement).setPointerCapture(e.pointerId); }}
+              >
+                <div className="absolute left-[3px] top-0 bottom-0 w-px bg-white/50" />
+              </div>
+              {/* Gamma line */}
+              <div
+                className="absolute top-0 bottom-0 cursor-ew-resize"
+                style={{ left: `${(gammaSliderPos / 255) * 100}%`, width: 7, transform: 'translateX(-3px)' }}
+                onPointerDown={(e) => { e.preventDefault(); e.stopPropagation(); histDragRef.current = 'gamma'; (e.target as HTMLElement).setPointerCapture(e.pointerId); }}
+              >
+                <div className="absolute left-[3px] top-0 bottom-0 w-px bg-white/30" />
+              </div>
+              {/* Highlight line */}
+              <div
+                className="absolute top-0 bottom-0 cursor-ew-resize"
+                style={{ left: `${(levels.highlightIn / 255) * 100}%`, width: 7, transform: 'translateX(-3px)' }}
+                onPointerDown={(e) => { e.preventDefault(); e.stopPropagation(); histDragRef.current = 'highlight'; (e.target as HTMLElement).setPointerCapture(e.pointerId); }}
+              >
+                <div className="absolute left-[3px] top-0 bottom-0 w-px bg-white/50" />
+              </div>
             </div>
           </div>
 
@@ -633,16 +666,15 @@ export function LevelsNode(props: NodeProps) {
             />
 
             <div className="flex items-center gap-2 mt-1">
-              <input
-                type="number"
-                className="text-[11px] text-zinc-300 bg-[#212121] rounded-lg px-2 py-1 border border-[#333] w-14 text-center focus:outline-none nodrag [&::-webkit-inner-spin-button]:appearance-none"
+              <NodeNumberInput
+                variant="narrow"
                 value={levels.shadowIn} min={0} max={254}
                 onChange={(e) => setLevels((l) => ({ ...l, shadowIn: Number(e.target.value) }))}
                 onBlur={() => commitLevels()}
               />
-              <input
-                type="number"
-                className="text-[11px] text-zinc-300 bg-[#212121] rounded-lg px-2 py-1 border border-[#333] flex-1 text-center focus:outline-none nodrag [&::-webkit-inner-spin-button]:appearance-none"
+              <NodeNumberInput
+                variant="narrow"
+                className="flex-1"
                 value={levels.gamma.toFixed(2)} min={0.1} max={9.99} step={0.01}
                 onChange={(e) => {
                   const v = parseFloat(e.target.value);
@@ -650,9 +682,8 @@ export function LevelsNode(props: NodeProps) {
                 }}
                 onBlur={() => commitLevels()}
               />
-              <input
-                type="number"
-                className="text-[11px] text-zinc-300 bg-[#212121] rounded-lg px-2 py-1 border border-[#333] w-14 text-center focus:outline-none nodrag [&::-webkit-inner-spin-button]:appearance-none"
+              <NodeNumberInput
+                variant="narrow"
                 value={levels.highlightIn} min={1} max={255}
                 onChange={(e) => setLevels((l) => ({ ...l, highlightIn: Number(e.target.value) }))}
                 onBlur={() => commitLevels()}
@@ -677,17 +708,15 @@ export function LevelsNode(props: NodeProps) {
             </Slider.Root>
 
             <div className="flex items-center gap-2 mt-1">
-              <input
-                type="number"
-                className="text-[11px] text-zinc-300 bg-[#212121] rounded-lg px-2 py-1 border border-[#333] w-14 text-center focus:outline-none nodrag [&::-webkit-inner-spin-button]:appearance-none"
+              <NodeNumberInput
+                variant="narrow"
                 value={levels.shadowOut} min={0} max={255}
                 onChange={(e) => setLevels((l) => ({ ...l, shadowOut: Number(e.target.value) }))}
                 onBlur={() => commitLevels()}
               />
               <div className="flex-1" />
-              <input
-                type="number"
-                className="text-[11px] text-zinc-300 bg-[#212121] rounded-lg px-2 py-1 border border-[#333] w-14 text-center focus:outline-none nodrag [&::-webkit-inner-spin-button]:appearance-none"
+              <NodeNumberInput
+                variant="narrow"
                 value={levels.highlightOut} min={0} max={255}
                 onChange={(e) => setLevels((l) => ({ ...l, highlightOut: Number(e.target.value) }))}
                 onBlur={() => commitLevels()}

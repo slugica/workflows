@@ -8,6 +8,8 @@ import { useFlowStore } from '@/store/flowStore';
 import { Droplets } from 'lucide-react';
 import { VideoPreviewPlayer } from './VideoPreviewPlayer';
 import { NodeQuickActions } from './NodeQuickActions';
+import { NodeSelect, NodeSlider, NodeLabel, NodeControlsRow } from './controls';
+import { theme } from '@/lib/theme';
 
 const BLUR_TYPES = [
   { label: 'Gaussian', value: 'gaussian' },
@@ -210,11 +212,15 @@ export function BlurNode(props: NodeProps) {
       {/* Card */}
       <div
         className={`
-          bg-[#171717] rounded-[24px] border-2 border-[#212121] relative flex flex-col items-start
+          rounded-[24px] border-2 relative flex flex-col items-start
           p-4 pt-3 w-full
           drop-shadow-sm group-hover:drop-shadow-md
           ${selected ? 'border-white/30 show-labels' : ''}
         `}
+        style={{
+          backgroundColor: theme.surface1,
+          borderColor: selected ? undefined : theme.border1,
+        }}
       >
         {/* Header */}
         <header className="mb-2 flex h-7 items-center justify-between gap-2 self-stretch">
@@ -240,7 +246,7 @@ export function BlurNode(props: NodeProps) {
                   id={handle.id}
                   className="!relative !transform-none !w-[18px] !h-[18px] !rounded-full !border-2 !left-0 !top-0 !flex !items-center !justify-center"
                   style={{
-                    backgroundColor: isConnected ? color : '#171717',
+                    backgroundColor: isConnected ? color : theme.surface1,
                     borderColor: color,
                   }}
                 >
@@ -272,7 +278,7 @@ export function BlurNode(props: NodeProps) {
                   id={handle.id}
                   className="!relative !transform-none !w-[18px] !h-[18px] !rounded-full !border-2 !left-0 !top-0 !flex !items-center !justify-center"
                   style={{
-                    backgroundColor: isConnected ? color : '#171717',
+                    backgroundColor: isConnected ? color : theme.surface1,
                     borderColor: color,
                   }}
                 >
@@ -316,8 +322,8 @@ export function BlurNode(props: NodeProps) {
 
               {/* Show result or original */}
               <div
-                className="relative bg-[#212121] rounded-2xl overflow-hidden"
-                style={contentSize ? { width: contentSize.w, height: contentSize.h } : undefined}
+                className="relative rounded-2xl overflow-hidden"
+                style={{ ...(contentSize ? { width: contentSize.w, height: contentSize.h } : {}), backgroundColor: theme.previewBg }}
               >
                 {isVideo ? (
                   <VideoPreviewPlayer
@@ -335,32 +341,22 @@ export function BlurNode(props: NodeProps) {
               </div>
 
               {/* Controls */}
-              <div className="mt-3 flex items-center gap-3 self-stretch">
-                <span className="text-[11px] text-zinc-500">Type</span>
-                <select
-                  className="bg-[#212121] text-zinc-300 text-xs rounded-lg px-2 py-1.5 border border-[#333] focus:outline-none nodrag"
-                  value={blurType}
-                  onChange={(e) => setBlurType(e.target.value)}
-                >
-                  {BLUR_TYPES.map((bt) => (
-                    <option key={bt.value} value={bt.value}>{bt.label}</option>
-                  ))}
-                </select>
-                <span className="text-[11px] text-zinc-500">Size</span>
-                <input
-                  type="range"
+              <NodeControlsRow>
+                <NodeLabel>Type</NodeLabel>
+                <NodeSelect value={blurType} onValueChange={setBlurType} options={BLUR_TYPES} />
+                <NodeLabel>Size</NodeLabel>
+                <NodeSlider
                   min={0}
                   max={50}
                   step={1}
                   value={blurSize}
                   onChange={(e) => setBlurSize(Number(e.target.value))}
                   onPointerUp={() => setCommittedSize(blurSize)}
-                  className="flex-1 accent-white h-1 nodrag"
                 />
-              </div>
+              </NodeControlsRow>
             </div>
           ) : (
-            <div className="h-[320px] bg-[#212121] rounded-2xl checkerboard flex items-center justify-center">
+            <div className="h-[320px] rounded-2xl checkerboard flex items-center justify-center" style={{ backgroundColor: theme.previewBg }}>
               <span className="text-zinc-500 text-sm">Connect a file input</span>
             </div>
           )}

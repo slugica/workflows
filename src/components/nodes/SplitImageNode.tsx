@@ -7,6 +7,8 @@ import { resolveInputImageUrl } from '@/lib/resolveInput';
 import { useFlowStore } from '@/store/flowStore';
 import { Grid2x2 } from 'lucide-react';
 import { NodeQuickActions } from './NodeQuickActions';
+import { NodeSelect, NodeLabel } from './controls';
+import { theme } from '@/lib/theme';
 
 type GridSize = '2x2' | '3x2' | '3x3' | '4x2' | '4x3' | '4x4' | '5x5';
 
@@ -230,12 +232,16 @@ export function SplitImageNode(props: NodeProps) {
       {/* Card */}
       <div
         className={`
-          bg-[#171717] rounded-[24px] border-2 border-[#212121] relative flex flex-col items-start
+          rounded-[24px] border-2 relative flex flex-col items-start
           p-4 pt-3 w-full
           drop-shadow-sm group-hover:drop-shadow-md
           ${selected ? 'border-white/30 show-labels' : ''}
         `}
-        style={minCardHeight ? { minHeight: minCardHeight } : undefined}
+        style={{
+          backgroundColor: theme.surface1,
+          borderColor: selected ? undefined : theme.border1,
+          ...(minCardHeight ? { minHeight: minCardHeight } : {}),
+        }}
       >
         {/* Header */}
         <header className="mb-2 flex h-7 items-center justify-between gap-2 self-stretch">
@@ -259,7 +265,7 @@ export function SplitImageNode(props: NodeProps) {
                   id={handle.id}
                   className="!relative !transform-none !w-[18px] !h-[18px] !rounded-full !border-2 !left-0 !top-0 !flex !items-center !justify-center"
                   style={{
-                    backgroundColor: isConnected ? color : '#171717',
+                    backgroundColor: isConnected ? color : theme.surface1,
                     borderColor: color,
                   }}
                 >
@@ -292,7 +298,7 @@ export function SplitImageNode(props: NodeProps) {
                   id={handle.id}
                   className="!relative !transform-none !w-[18px] !h-[18px] !rounded-full !border-2 !left-0 !top-0 !flex !items-center !justify-center"
                   style={{
-                    backgroundColor: isConnected ? color : '#171717',
+                    backgroundColor: isConnected ? color : theme.surface1,
                     borderColor: color,
                   }}
                 >
@@ -321,8 +327,8 @@ export function SplitImageNode(props: NodeProps) {
                 onLoad={(e) => setImgNatural({ w: e.currentTarget.naturalWidth, h: e.currentTarget.naturalHeight })}
               />
               <div
-                className="relative bg-[#212121] rounded-2xl overflow-hidden"
-                style={contentSize ? { width: contentSize.w, height: contentSize.h } : undefined}
+                className="relative rounded-2xl overflow-hidden"
+                style={{ ...(contentSize ? { width: contentSize.w, height: contentSize.h } : {}), backgroundColor: theme.previewBg }}
               >
                 {isRunning ? (
                   /* Shimmer grid while processing */
@@ -344,23 +350,20 @@ export function SplitImageNode(props: NodeProps) {
               </div>
             </>
           ) : (
-            <div className="relative aspect-square bg-[#212121] rounded-2xl overflow-hidden">
+            <div className="relative aspect-square rounded-2xl overflow-hidden" style={{ backgroundColor: theme.previewBg }}>
               <GridOverlay cols={cols} rows={rows} isDone={false} />
             </div>
           )}
 
           {/* Grid Size selector */}
-          <div className="mt-3 self-stretch">
-            <div className="text-[11px] text-zinc-500 mb-1">Grid Size</div>
-            <select
-              className="w-full bg-[#212121] text-zinc-300 text-xs rounded-lg px-3 py-2 border border-[#333] focus:outline-none nodrag"
+          <div className="mt-3 flex items-center gap-2 self-stretch">
+            <NodeLabel>Grid Size</NodeLabel>
+            <NodeSelect
+              fullWidth
               value={gridSize}
-              onChange={(e) => handleGridChange(e.target.value as GridSize)}
-            >
-              {GRID_OPTIONS.map((g) => (
-                <option key={g} value={g}>{g}</option>
-              ))}
-            </select>
+              onValueChange={(val) => handleGridChange(val as GridSize)}
+              options={GRID_OPTIONS.map((g) => ({ value: g, label: g }))}
+            />
           </div>
 
           {/* Error */}
@@ -373,9 +376,12 @@ export function SplitImageNode(props: NodeProps) {
             <button
               className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-medium transition-colors nodrag ${
                 hasInput && !isRunning
-                  ? 'bg-[#212121] text-zinc-300 hover:bg-[#2a2a2a]'
-                  : 'bg-[#212121] text-zinc-600 cursor-not-allowed'
+                  ? 'text-zinc-300'
+                  : 'text-zinc-600 cursor-not-allowed'
               }`}
+              style={{ backgroundColor: theme.surface2 }}
+              onMouseOver={(e) => { if (hasInput && !isRunning) e.currentTarget.style.backgroundColor = theme.surfaceHover; }}
+              onMouseOut={(e) => { e.currentTarget.style.backgroundColor = theme.surface2; }}
               disabled={!hasInput || isRunning}
               onClick={(e) => { e.stopPropagation(); handleRun(); }}
             >

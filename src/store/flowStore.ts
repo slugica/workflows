@@ -10,7 +10,7 @@ import {
   Connection,
   addEdge,
 } from '@xyflow/react';
-import { FlowNodeData, FlowNodeType, NODE_TEMPLATES, HandleDef } from '@/lib/types';
+import { FlowNodeData, FlowNodeType, NODE_TEMPLATES, HandleDef, detectMediaType } from '@/lib/types';
 import { executeNode } from '@/lib/executeNode';
 
 interface Snapshot {
@@ -276,13 +276,15 @@ export const useFlowStore = create<FlowState>((set, get) => ({
     const newNodeId = get().selectedNodeId;
     if (!newNodeId) return;
 
-    // Find target input handle (prefer image, then file, then video)
+    // Find target input handle — use runtime media type for best match
     const newNode = get().nodes.find((n) => n.id === newNodeId);
     if (!newNode) return;
     const newData = newNode.data as unknown as FlowNodeData;
+    const actualType = detectMediaType(sourceData) || sourceOutput.type;
     const targetInput =
-      newData.handles.inputs.find((h) => h.type === 'image') ||
+      newData.handles.inputs.find((h) => h.type === actualType) ||
       newData.handles.inputs.find((h) => h.type === 'file') ||
+      newData.handles.inputs.find((h) => h.type === 'image') ||
       newData.handles.inputs.find((h) => h.type === 'video');
     if (!targetInput) return;
 
@@ -316,10 +318,10 @@ export const useFlowStore = create<FlowState>((set, get) => ({
     if (!newNode) return;
     const newData = newNode.data as unknown as FlowNodeData;
 
-    // Find compatible input: exact type match first, then file fallback
-    const srcType = sourceOutput.type;
+    // Find compatible input: runtime media type first, then static type, then fallback
+    const actualType = detectMediaType(sourceData) || sourceOutput.type;
     const targetInput =
-      newData.handles.inputs.find((h) => h.type === srcType) ||
+      newData.handles.inputs.find((h) => h.type === actualType) ||
       newData.handles.inputs.find((h) => h.type === 'file') ||
       newData.handles.inputs.find((h) => h.type === 'image') ||
       newData.handles.inputs.find((h) => h.type === 'video');

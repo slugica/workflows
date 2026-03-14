@@ -42,9 +42,10 @@ import { CombineVideoNode } from '@/components/nodes/CombineVideoNode';
 import { CombineAudioVideoNode } from '@/components/nodes/CombineAudioVideoNode';
 import { VideoIteratorNode } from '@/components/nodes/VideoIteratorNode';
 import { ExtractFrameNode } from '@/components/nodes/ExtractFrameNode';
-import { FlowNodeType, HANDLE_COLORS, resolveFileHandleColor, type FlowNodeData, type HandleDataType } from '@/lib/types';
+import { FlowNodeType, HANDLE_COLORS, resolveFileHandleColor, detectMediaType, type FlowNodeData, type HandleDataType } from '@/lib/types';
 import { ConnectionMenu } from '@/components/ConnectionMenu';
 import { MultiSelectionToolbar } from '@/components/MultiSelectionToolbar';
+import { theme } from '@/lib/theme';
 
 import { BaseEdge, type EdgeProps } from '@xyflow/react';
 
@@ -179,8 +180,15 @@ function BottomBar() {
   };
 
   const btnBase = 'flex items-center justify-center w-9 h-9 rounded-xl transition-colors';
-  const btnDefault = `${btnBase} text-zinc-400 hover:text-white hover:bg-[#2a2a2a]`;
-  const btnActive = `${btnBase} text-white bg-[#2a2a2a]`;
+
+  const btnStyle = (active: boolean): React.CSSProperties => ({
+    background: active ? theme.surfaceHover : undefined,
+  });
+
+  const btnHoverHandlers = (active: boolean) => active ? {} : {
+    onMouseEnter: (e: React.MouseEvent<HTMLButtonElement>) => { e.currentTarget.style.background = theme.surfaceHover; },
+    onMouseLeave: (e: React.MouseEvent<HTMLButtonElement>) => { e.currentTarget.style.background = ''; },
+  };
 
   return (
     <div className="flex items-center gap-1 mb-2">
@@ -192,10 +200,12 @@ function BottomBar() {
         onChange={handleFileChange}
       />
       {/* Main tool group */}
-      <div className="flex items-center gap-0.5 bg-[#141414] border border-[#222] rounded-2xl px-1 py-1">
+      <div className="flex items-center gap-0.5 rounded-2xl px-1 py-1" style={{ background: theme.bottomBarBg, border: `1px solid ${theme.border1}` }}>
         {/* Select tool */}
         <button
-          className={drawingMode === 'none' ? btnActive : btnDefault}
+          className={`${btnBase} ${drawingMode === 'none' ? 'text-white' : 'text-zinc-400 hover:text-white'}`}
+          style={btnStyle(drawingMode === 'none')}
+          {...btnHoverHandlers(drawingMode === 'none')}
           onClick={() => setDrawingMode('none')}
           title="Select (V)"
         >
@@ -205,11 +215,13 @@ function BottomBar() {
         </button>
 
         {/* Divider */}
-        <div className="w-px h-5 bg-[#2a2a2a] mx-0.5" />
+        <div className="w-px h-5 mx-0.5" style={{ background: theme.surfaceHover }} />
 
         {/* Section */}
         <button
-          className={drawingMode === 'section' ? btnActive : btnDefault}
+          className={`${btnBase} ${drawingMode === 'section' ? 'text-white' : 'text-zinc-400 hover:text-white'}`}
+          style={btnStyle(drawingMode === 'section')}
+          {...btnHoverHandlers(drawingMode === 'section')}
           onClick={handleSectionClick}
           title="Draw Section"
         >
@@ -219,11 +231,13 @@ function BottomBar() {
         </button>
 
         {/* Divider */}
-        <div className="w-px h-5 bg-[#2a2a2a] mx-0.5" />
+        <div className="w-px h-5 mx-0.5" style={{ background: theme.surfaceHover }} />
 
         {/* Upload */}
         <button
-          className={btnDefault}
+          className={`${btnBase} text-zinc-400 hover:text-white`}
+          style={btnStyle(false)}
+          {...btnHoverHandlers(false)}
           onClick={handleUpload}
           title="Upload File"
         >
@@ -238,7 +252,8 @@ function BottomBar() {
       {/* Zoom group */}
       <div className="relative" ref={zoomRef}>
         <button
-          className="flex items-center gap-1 bg-[#141414] border border-[#222] rounded-2xl px-3 py-1 h-[44px] text-[12px] text-zinc-300 hover:text-white transition-colors min-w-[72px] justify-center"
+          className="flex items-center gap-1 rounded-2xl px-3 py-1 h-[44px] text-[12px] text-zinc-300 hover:text-white transition-colors min-w-[72px] justify-center"
+          style={{ background: theme.bottomBarBg, border: `1px solid ${theme.border1}` }}
           onClick={() => setZoomOpen(!zoomOpen)}
         >
           {pct}%
@@ -249,7 +264,7 @@ function BottomBar() {
 
         {/* Zoom dropdown */}
         {zoomOpen && (
-          <div className="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl py-1 min-w-[160px] shadow-xl">
+          <div className="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 rounded-xl py-1 min-w-[160px] shadow-xl" style={{ background: theme.surface3, border: `1px solid ${theme.border2}` }}>
             {[
               { label: 'Zoom in', action: () => zoomTo(Math.min(2, zoom + 0.25), { duration: 200 }), shortcut: '⌘+' },
               { label: 'Zoom out', action: () => zoomTo(Math.max(0.15, zoom - 0.25), { duration: 200 }), shortcut: '⌘−' },
@@ -260,11 +275,13 @@ function BottomBar() {
               { label: 'Zoom to 200%', action: () => zoomTo(2, { duration: 200 }) },
             ].map((item, i) =>
               item === null ? (
-                <div key={i} className="h-px bg-[#2a2a2a] my-1" />
+                <div key={i} className="h-px my-1" style={{ background: theme.surfaceHover }} />
               ) : (
                 <button
                   key={i}
-                  className="w-full flex items-center justify-between px-3 py-1.5 text-[12px] text-zinc-300 hover:text-white hover:bg-[#252525] transition-colors"
+                  className="w-full flex items-center justify-between px-3 py-1.5 text-[12px] text-zinc-300 hover:text-white transition-colors"
+                  onMouseEnter={(e) => { e.currentTarget.style.background = theme.surfaceHover; }}
+                  onMouseLeave={(e) => { e.currentTarget.style.background = ''; }}
                   onClick={() => { item.action(); setZoomOpen(false); }}
                 >
                   <span>{item.label}</span>
@@ -277,9 +294,11 @@ function BottomBar() {
       </div>
 
       {/* Undo/Redo group */}
-      <div className="flex items-center gap-0.5 bg-[#141414] border border-[#222] rounded-2xl px-1 py-1">
+      <div className="flex items-center gap-0.5 rounded-2xl px-1 py-1" style={{ background: theme.bottomBarBg, border: `1px solid ${theme.border1}` }}>
         <button
-          className={`${btnBase} ${undoStack.length > 0 ? 'text-zinc-400 hover:text-white hover:bg-[#2a2a2a]' : 'text-zinc-600 cursor-not-allowed'}`}
+          className={`${btnBase} ${undoStack.length > 0 ? 'text-zinc-400 hover:text-white' : 'text-zinc-600 cursor-not-allowed'}`}
+          style={btnStyle(false)}
+          {...(undoStack.length > 0 ? btnHoverHandlers(false) : {})}
           onClick={undo}
           disabled={undoStack.length === 0}
           title="Undo (Ctrl+Z)"
@@ -290,7 +309,9 @@ function BottomBar() {
           </svg>
         </button>
         <button
-          className={`${btnBase} ${redoStack.length > 0 ? 'text-zinc-400 hover:text-white hover:bg-[#2a2a2a]' : 'text-zinc-600 cursor-not-allowed'}`}
+          className={`${btnBase} ${redoStack.length > 0 ? 'text-zinc-400 hover:text-white' : 'text-zinc-600 cursor-not-allowed'}`}
+          style={btnStyle(false)}
+          {...(redoStack.length > 0 ? btnHoverHandlers(false) : {})}
           onClick={redo}
           disabled={redoStack.length === 0}
           title="Redo (Ctrl+Y)"
@@ -450,14 +471,14 @@ function SectionDrawingOverlay() {
     >
       {preview && (
         <div
-          className="absolute border border-[#555] bg-[#0a0a0a]/30 pointer-events-none"
-          style={{ left: preview.left, top: preview.top, width: preview.width, height: preview.height }}
+          className="absolute pointer-events-none"
+          style={{ left: preview.left, top: preview.top, width: preview.width, height: preview.height, border: `1px solid ${theme.sectionColors[0]}`, background: `${theme.canvas}4d` }}
         />
       )}
       {rect && rect.width > 0 && rect.height > 0 && (
         <div
-          className="absolute border border-[#555] bg-[#0a0a0a]/40 pointer-events-none"
-          style={{ left: rect.left, top: rect.top, width: rect.width, height: rect.height }}
+          className="absolute pointer-events-none"
+          style={{ left: rect.left, top: rect.top, width: rect.width, height: rect.height, border: `1px solid ${theme.sectionColors[0]}`, background: `${theme.canvas}66` }}
         />
       )}
     </div>
@@ -623,7 +644,17 @@ export function FlowCanvas() {
     if (!params.handleId) return;
     const info = parseHandleInfo(params.handleId);
     if (info) {
-      setConnectingHandleType(info.type);
+      let effectiveType = info.type;
+      // Resolve runtime media type for 'file' handles
+      if (effectiveType === 'file') {
+        const nodeId = params.handleId.split('|')[0];
+        const srcNode = useFlowStore.getState().nodes.find(n => n.id === nodeId);
+        if (srcNode) {
+          const actual = detectMediaType(srcNode.data as unknown as FlowNodeData);
+          if (actual) effectiveType = actual;
+        }
+      }
+      setConnectingHandleType(effectiveType);
       connectingSourceId.current = params.handleId.split('|')[0];
       connectingHandleId.current = params.handleId;
     }
@@ -676,12 +707,35 @@ export function FlowCanvas() {
     const sourceInfo = parseHandleInfo(sourceHandle);
     const targetInfo = parseHandleInfo(targetHandle);
     if (!sourceInfo || !targetInfo) return false;
-    const mediaTypes = new Set(['file', 'image', 'video', 'audio']);
-    const typesMatch = sourceInfo.type === targetInfo.type
-      || sourceInfo.type === 'file' && mediaTypes.has(targetInfo.type)
-      || targetInfo.type === 'file' && mediaTypes.has(sourceInfo.type);
-    if (!typesMatch) return false;
     if (connection.source === connection.target) return false;
+
+    const mediaTypes = new Set(['file', 'image', 'video', 'audio']);
+    let srcType = sourceInfo.type;
+    let tgtType = targetInfo.type;
+
+    // Runtime: resolve actual media type for 'file' handles
+    if (srcType === 'file' && connection.source) {
+      const store = useFlowStore.getState();
+      const srcNode = store.nodes.find(n => n.id === connection.source);
+      if (srcNode) {
+        const actual = detectMediaType(srcNode.data as unknown as FlowNodeData);
+        if (actual) srcType = actual;
+      }
+    }
+    if (tgtType === 'file' && connection.target) {
+      const store = useFlowStore.getState();
+      const tgtNode = store.nodes.find(n => n.id === connection.target);
+      if (tgtNode) {
+        const actual = detectMediaType(tgtNode.data as unknown as FlowNodeData);
+        if (actual) tgtType = actual;
+      }
+    }
+
+    const typesMatch = srcType === tgtType
+      || srcType === 'file' && mediaTypes.has(tgtType)
+      || tgtType === 'file' && mediaTypes.has(srcType);
+    if (!typesMatch) return false;
+
     // Prevent same source node from connecting to multiple inputs on the same target
     const currentEdges = useFlowStore.getState().edges;
     const alreadyConnected = currentEdges.some(
@@ -779,8 +833,9 @@ export function FlowCanvas() {
       >
         <Background variant={BackgroundVariant.Dots} gap={12} size={0.5} color="rgba(255,255,255,0.25)" />
         <MiniMap
-          className="!bg-[#171717] !border-[#212121] !rounded-lg"
-          nodeColor="#212121"
+          style={{ background: theme.surface1, borderColor: theme.border1 }}
+          className="!rounded-lg"
+          nodeColor={theme.surface2}
           maskColor="rgba(0, 0, 0, 0.6)"
         />
         <Panel position="bottom-center">
