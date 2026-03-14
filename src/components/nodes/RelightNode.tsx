@@ -7,6 +7,7 @@ import { resolveInputImageUrl } from '@/lib/resolveInput';
 import { ensureRemoteUrl } from '@/lib/executeNode';
 import { useFlowStore } from '@/store/flowStore';
 import { Sun, Play, Loader, ChevronLeft, ChevronRight, Trash2 } from 'lucide-react';
+import { NodeQuickActions } from './NodeQuickActions';
 
 /* ─── Prompt generation helpers ─── */
 function getAzimuthPrompt(az: number): string {
@@ -137,7 +138,7 @@ export function RelightNode(props: NodeProps) {
   const resultUrl = resultMeta?.format !== 'preview' ? resultMeta?.content : null;
 
   return (
-    <div
+    <NodeQuickActions nodeId={id} selected={selected} data={data}
       className="group relative flex flex-col items-center gap-1"
       style={{ width: 356 }}
       onClick={() => selectNode(id)}
@@ -374,6 +375,6 @@ export function RelightNode(props: NodeProps) {
           </div>
         </div>
       </div>
-    </div>
+    </NodeQuickActions>
   );
 }

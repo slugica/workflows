@@ -7,6 +7,7 @@ import { ensureRemoteUrl, executeRendi } from '@/lib/executeNode';
 import { useFlowStore } from '@/store/flowStore';
 import { Film, Play, Loader } from 'lucide-react';
 import { ResultNavOverlay } from '@/components/nodes/ResultNavOverlay';
+import { NodeQuickActions } from './NodeQuickActions';
 
 /**
  * Resolve a single input URL by handle type substring (e.g. 'input:video' or 'input:audio').
@@ -139,7 +140,7 @@ export function CombineAudioVideoNode(props: NodeProps) {
   const canRun = !!videoUrl && !!audioUrl && !isRunning;
 
   return (
-    <div
+    <NodeQuickActions nodeId={id} selected={selected} data={data}
       className="group relative flex flex-col items-center gap-1"
       style={{ width: 360 }}
       onClick={() => selectNode(id)}
@@ -294,6 +295,6 @@ export function CombineAudioVideoNode(props: NodeProps) {
           </div>
         </div>
       </div>
-    </div>
+    </NodeQuickActions>
   );
 }

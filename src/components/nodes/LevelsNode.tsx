@@ -8,6 +8,7 @@ import { resolveInput } from '@/lib/resolveInput';
 import { useFlowStore } from '@/store/flowStore';
 import { SlidersHorizontal, RotateCcw } from 'lucide-react';
 import { VideoPreviewPlayer } from './VideoPreviewPlayer';
+import { NodeQuickActions } from './NodeQuickActions';
 
 type Channel = 'rgb' | 'red' | 'green' | 'blue';
 
@@ -467,7 +468,7 @@ export function LevelsNode(props: NodeProps) {
   };
 
   return (
-    <div
+    <NodeQuickActions nodeId={id} selected={selected} data={data}
       className="group relative flex flex-col items-center gap-1"
       style={{ width: contentSize ? contentSize.w + 36 : 480 }}
       onClick={() => selectNode(id)}
@@ -695,6 +696,6 @@ export function LevelsNode(props: NodeProps) {
           </div>
         </div>
       </div>
-    </div>
+    </NodeQuickActions>
   );
 }

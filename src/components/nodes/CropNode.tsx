@@ -8,6 +8,7 @@ import { FlowNodeData, HANDLE_COLORS, resolveFileHandleColor } from '@/lib/types
 import { resolveInput } from '@/lib/resolveInput';
 import { useFlowStore } from '@/store/flowStore';
 import { Crop as CropIcon, Link, Unlink } from 'lucide-react';
+import { NodeQuickActions } from './NodeQuickActions';
 
 const ASPECT_RATIOS: { label: string; value: number | undefined }[] = [
   { label: 'Free', value: undefined },
@@ -292,7 +293,7 @@ export function CropNode(props: NodeProps) {
   const showSettings = isVideo ? !!videoSize : !!inputUrl;
 
   return (
-    <div
+    <NodeQuickActions nodeId={id} selected={selected} data={data}
       className="group relative flex flex-col items-center gap-1" style={{ width: 356 }}
       onClick={() => selectNode(id)}
     >
@@ -514,6 +515,6 @@ export function CropNode(props: NodeProps) {
         )}
 
       </div>
-    </div>
+    </NodeQuickActions>
   );
 }

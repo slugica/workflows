@@ -653,12 +653,11 @@ export function FlowCanvas() {
     const flowPos = reactFlowInstance.current?.screenToFlowPosition({ x: clientX, y: clientY });
     if (!flowPos) return;
 
-    // Clamp menu position to fit within viewport (menu is 280×420 max)
+    // Clamp menu position to fit within viewport
     const menuW = 280;
-    const menuH = 420;
     const pad = 10;
     const clampedX = Math.min(clientX, window.innerWidth - menuW - pad);
-    const clampedY = Math.max(pad, Math.min(clientY, window.innerHeight - menuH - pad));
+    const clampedY = Math.max(pad, Math.min(clientY, window.innerHeight - 100));
 
     setConnectionMenu({
       sourceId,

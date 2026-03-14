@@ -7,6 +7,7 @@ import { ensureRemoteUrl, executeRendi } from '@/lib/executeNode';
 import { useFlowStore } from '@/store/flowStore';
 import { Film, Play, Loader, ChevronDown } from 'lucide-react';
 import { ResultNavOverlay } from '@/components/nodes/ResultNavOverlay';
+import { NodeQuickActions } from './NodeQuickActions';
 
 const HANDLE_SIZE = 18;
 const HEADER_OFFSET = 68;
@@ -316,7 +317,7 @@ export function CombineVideoNode(props: NodeProps) {
   const canRun = connectedVideos.length >= 2 && !isRunning;
 
   return (
-    <div
+    <NodeQuickActions nodeId={id} selected={selected} data={data}
       className="group relative flex flex-col items-center gap-1"
       style={{ width: 360 }}
       onClick={() => selectNode(id)}
@@ -493,6 +494,6 @@ export function CombineVideoNode(props: NodeProps) {
           </div>
         </div>
       </div>
-    </div>
+    </NodeQuickActions>
   );
 }

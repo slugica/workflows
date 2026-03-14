@@ -6,6 +6,7 @@ import { FlowNodeData, HANDLE_COLORS, resolveFileHandleColor } from '@/lib/types
 import { resolveInputImageUrl } from '@/lib/resolveInput';
 import { useFlowStore } from '@/store/flowStore';
 import { Grid2x2 } from 'lucide-react';
+import { NodeQuickActions } from './NodeQuickActions';
 
 type GridSize = '2x2' | '3x2' | '3x3' | '4x2' | '4x3' | '4x4' | '5x5';
 
@@ -208,7 +209,7 @@ export function SplitImageNode(props: NodeProps) {
   const hasInput = !!inputImageUrl;
 
   return (
-    <div
+    <NodeQuickActions nodeId={id} selected={selected} data={data}
       className="group relative flex flex-col items-center gap-1"
       style={{ width: contentSize ? contentSize.w + 36 : 480 }}
       onClick={() => selectNode(id)}
@@ -386,6 +387,6 @@ export function SplitImageNode(props: NodeProps) {
           </div>
         </div>
       </div>
-    </div>
+    </NodeQuickActions>
   );
 }

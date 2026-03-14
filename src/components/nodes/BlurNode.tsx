@@ -7,6 +7,7 @@ import { resolveInput } from '@/lib/resolveInput';
 import { useFlowStore } from '@/store/flowStore';
 import { Droplets } from 'lucide-react';
 import { VideoPreviewPlayer } from './VideoPreviewPlayer';
+import { NodeQuickActions } from './NodeQuickActions';
 
 const BLUR_TYPES = [
   { label: 'Gaussian', value: 'gaussian' },
@@ -188,7 +189,7 @@ export function BlurNode(props: NodeProps) {
     : null;
 
   return (
-    <div
+    <NodeQuickActions nodeId={id} selected={selected} data={data}
       className="group relative flex flex-col items-center gap-1"
       style={{ width: contentSize ? contentSize.w + 36 : 356 }}
       onClick={() => selectNode(id)}
@@ -365,6 +366,6 @@ export function BlurNode(props: NodeProps) {
           )}
         </div>
       </div>
-    </div>
+    </NodeQuickActions>
   );
 }

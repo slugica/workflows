@@ -11,30 +11,18 @@ interface ConnectionMenuProps {
   onClose: () => void;
 }
 
-// Which categories are compatible with each source handle type
-const COMPATIBLE_CATEGORIES: Record<string, string[]> = {
-  image: [
-    'Essentials', 'Image Generation', 'Image Editing', 'Upscale', 'Utility',
-    'Video Generation', 'Motion Transfer', 'Lipsync',
-    'Image Utility', 'Shared Utility',
-  ],
-  video: [
-    'Essentials', 'Video Upscale', 'Video Extend', 'Video Editing', 'Motion Transfer', 'Lipsync',
-    'Video Utility', 'Shared Utility',
-  ],
-  file: [
-    'Essentials', 'Image Generation', 'Image Editing', 'Upscale', 'Utility',
-    'Video Generation', 'Video Upscale', 'Video Extend', 'Video Editing', 'Motion Transfer', 'Lipsync',
-    'Image Utility', 'Video Utility', 'Shared Utility',
-  ],
-  text: [
-    'Essentials', 'Image Generation', 'Image Editing', 'Video Generation',
-    'Video Editing', 'Video Extend', 'Motion Transfer', 'Lipsync',
-  ],
-  audio: [
-    'Essentials', 'Lipsync',
-  ],
-};
+// Track recently selected nodes (persists across menu opens, resets on page reload)
+const MAX_RECENT = 5;
+let recentSelections: { type: FlowNodeType; label: string }[] = [
+  { type: 'preview', label: 'Preview' }, // default
+];
+
+function addToRecent(type: FlowNodeType, label: string) {
+  recentSelections = [
+    { type, label },
+    ...recentSelections.filter((r) => !(r.type === type && r.label === label)),
+  ].slice(0, MAX_RECENT);
+}
 
 // Check if a template has a compatible input for the source type
 function isCompatible(template: { type: FlowNodeType; defaultData: { handles?: { inputs: { type: HandleDataType }[] } } }, sourceType: HandleDataType): boolean {
@@ -48,23 +36,44 @@ function isCompatible(template: { type: FlowNodeType; defaultData: { handles?: {
   });
 }
 
-// Section groupings for the menu
+// Subcategory definition (mirrors sidebar)
+interface SubCat {
+  label: string;
+  categories: string[];
+}
+
+const IMAGE_SUBS: SubCat[] = [
+  { label: 'Generate Image', categories: ['Image Generation'] },
+  { label: 'Edit Image', categories: ['Image Editing'] },
+  { label: 'Enhance Image', categories: ['Upscale'] },
+  { label: 'Image Utility', categories: ['Image Utility', 'Shared Utility'] },
+];
+
+const VIDEO_SUBS: SubCat[] = [
+  { label: 'Generate Video', categories: ['Video Generation'] },
+  { label: 'Edit Video', categories: ['Video Editing'] },
+  { label: 'Motion Transfer', categories: ['Motion Transfer'] },
+  { label: 'Lipsync', categories: ['Lipsync'] },
+  { label: 'Enhance Video', categories: ['Video Upscale'] },
+  { label: 'Extend Video', categories: ['Video Extend'] },
+  { label: 'Video Utility', categories: ['Video Utility', 'Shared Utility'] },
+];
+
 const MENU_SECTIONS = [
-  {
-    label: 'Image',
-    categories: ['Image Generation', 'Image Editing', 'Upscale', 'Utility', 'Image Utility', 'Shared Utility'],
-  },
-  {
-    label: 'Video',
-    categories: ['Video Generation', 'Video Editing', 'Video Upscale', 'Video Extend', 'Motion Transfer', 'Lipsync', 'Video Utility'],
-  },
+  { label: 'Image', subs: IMAGE_SUBS },
+  { label: 'Video', subs: VIDEO_SUBS },
 ];
 
 export function ConnectionMenu({ position, sourceHandleType, onSelect, onClose }: ConnectionMenuProps) {
   const [search, setSearch] = useState('');
-  const [expandedCategory, setExpandedCategory] = useState<string | null>(null);
+  const [hoveredSub, setHoveredSub] = useState<string | null>(null);
   const menuRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+
+  const handleSelect = (type: FlowNodeType, label: string) => {
+    addToRecent(type, label);
+    onSelect(type, label);
+  };
 
   // Focus search on open
   useEffect(() => {
@@ -108,7 +117,7 @@ export function ConnectionMenu({ position, sourceHandleType, onSelect, onClose }
     );
   }, [search, compatibleTemplates]);
 
-  // Group compatible templates by category for browsing
+  // Group compatible templates by category
   const groupedByCategory = useMemo(() => {
     const map = new Map<string, typeof compatibleTemplates>();
     for (const t of compatibleTemplates) {
@@ -119,20 +128,24 @@ export function ConnectionMenu({ position, sourceHandleType, onSelect, onClose }
     return map;
   }, [compatibleTemplates]);
 
-  // Quick add items
-  const quickItems = useMemo(() => {
-    const items: { label: string; type: FlowNodeType; templateLabel: string }[] = [];
-    items.push({ label: 'Preview', type: 'preview', templateLabel: 'Preview' });
-    return items.filter((item) =>
-      compatibleTemplates.some((t) => t.type === item.type && t.label === item.templateLabel)
-    );
-  }, [compatibleTemplates]);
+  // Get templates for a subcategory
+  const getSubTemplates = (sub: SubCat) => {
+    const templates: typeof compatibleTemplates = [];
+    for (const cat of sub.categories) {
+      const items = groupedByCategory.get(cat);
+      if (items) templates.push(...items);
+    }
+    return templates;
+  };
+
+  // Check if flyout should go left instead of right
+  const flyoutLeft = position.x + 280 + 240 > window.innerWidth;
 
   return (
     <div
       ref={menuRef}
-      className="fixed z-[9999] bg-[#171717] border border-[#333] rounded-xl shadow-2xl w-[280px] max-h-[420px] flex flex-col overflow-hidden"
-      style={{ left: position.x, top: position.y }}
+      className="fixed z-[9999] bg-[#171717] border border-[#333] rounded-xl shadow-2xl w-[280px] flex flex-col"
+      style={{ left: position.x, top: position.y, maxHeight: `${window.innerHeight - position.y - 16}px` }}
     >
       {/* Search */}
       <div className="p-2 border-b border-[#252525]">
@@ -151,13 +164,12 @@ export function ConnectionMenu({ position, sourceHandleType, onSelect, onClose }
       {/* Content */}
       <div className="flex-1 overflow-y-auto py-1">
         {searchResults ? (
-          /* Search results */
           searchResults.length > 0 ? (
             searchResults.map((t) => (
               <button
                 key={`${t.type}-${t.label}`}
                 className="w-full flex items-center gap-2 px-3 py-2 hover:bg-[#212121] text-left transition-colors"
-                onClick={() => onSelect(t.type, t.label)}
+                onClick={() => handleSelect(t.type, t.label)}
               >
                 <span className="text-[13px] text-zinc-300 flex-1 truncate">{t.label}</span>
                 <span className="text-[10px] text-zinc-600">{t.category}</span>
@@ -167,94 +179,158 @@ export function ConnectionMenu({ position, sourceHandleType, onSelect, onClose }
             <div className="text-center text-zinc-600 text-xs py-6">No compatible nodes found</div>
           )
         ) : (
-          /* Browse mode */
           <>
-            {/* Quick items */}
-            {quickItems.length > 0 && (
+            {/* Recent */}
+            {recentSelections.length > 0 && (
               <div className="mb-1">
                 <div className="px-3 py-1 text-[10px] font-medium text-zinc-500 uppercase tracking-wider">Recent</div>
-                {quickItems.map((item) => (
-                  <button
-                    key={item.templateLabel}
-                    className="w-full flex items-center gap-2 px-3 py-2 hover:bg-[#212121] text-left transition-colors"
-                    onClick={() => onSelect(item.type, item.templateLabel)}
-                  >
-                    <span className="text-[13px] text-zinc-300">{item.label}</span>
-                  </button>
-                ))}
+                {recentSelections
+                  .filter((r) => compatibleTemplates.some((t) => t.type === r.type && t.label === r.label))
+                  .map((r) => (
+                    <button
+                      key={`${r.type}-${r.label}`}
+                      className="w-full flex items-center gap-2 px-3 py-2 hover:bg-[#212121] text-left transition-colors"
+                      onClick={() => handleSelect(r.type, r.label)}
+                      onMouseEnter={() => setHoveredSub(null)}
+                    >
+                      <span className="text-[13px] text-zinc-300">{r.label}</span>
+                    </button>
+                  ))}
               </div>
             )}
 
-            {/* Sections */}
-            {MENU_SECTIONS.map((section) => {
-              const sectionCategories = section.categories.filter((c) => groupedByCategory.has(c));
-              if (sectionCategories.length === 0) return null;
+            {/* Add section with Essentials */}
+            <div className="mb-1">
+              <div className="px-3 py-1 text-[10px] font-medium text-zinc-500 uppercase tracking-wider">Add</div>
+              {/* Essentials as flyout */}
+              {groupedByCategory.has('Essentials') && (
+                <SubMenuItem
+                  label="Essentials"
+                  templates={groupedByCategory.get('Essentials')!.filter((t) => t.type !== 'prompt')}
+                  isHovered={hoveredSub === 'Essentials'}
+                  onHover={() => setHoveredSub('Essentials')}
+                  onLeave={() => setHoveredSub(null)}
+                  onSelect={handleSelect}
+                  flyoutLeft={flyoutLeft}
+                />
+              )}
+            </div>
+
+            {/* Image / Video sections — hide Image for video source only */}
+            {MENU_SECTIONS.filter((section) => {
+              if (sourceHandleType === 'video' && section.label === 'Image') return false;
+              return true;
+            }).map((section) => {
+              const subs = section.subs.filter((sub) =>
+                sub.categories.some((c) => groupedByCategory.has(c))
+              );
+              if (subs.length === 0) return null;
               return (
                 <div key={section.label} className="mb-1">
                   <div className="px-3 py-1 text-[10px] font-medium text-zinc-500 uppercase tracking-wider">
                     {section.label}
                   </div>
-                  {sectionCategories.map((cat) => {
-                    const templates = groupedByCategory.get(cat)!;
-                    const isExpanded = expandedCategory === cat;
-                    return (
-                      <div key={cat}>
+                  {subs.map((sub) => {
+                    const templates = getSubTemplates(sub);
+                    if (templates.length === 0) return null;
+                    if (templates.length === 1) {
+                      return (
                         <button
+                          key={sub.label}
                           className="w-full flex items-center gap-2 px-3 py-2 hover:bg-[#212121] text-left transition-colors"
-                          onClick={() => {
-                            if (templates.length === 1) {
-                              onSelect(templates[0].type, templates[0].label);
-                            } else {
-                              setExpandedCategory(isExpanded ? null : cat);
-                            }
-                          }}
+                          onClick={() => handleSelect(templates[0].type, templates[0].label)}
+                          onMouseEnter={() => setHoveredSub(null)}
                         >
-                          <span className="text-[13px] text-zinc-300 flex-1">{cat}</span>
-                          {templates.length > 1 && (
-                            <ChevronRight
-                              size={14}
-                              className={`text-zinc-500 transition-transform ${isExpanded ? 'rotate-90' : ''}`}
-                            />
-                          )}
+                          <span className="text-[13px] text-zinc-300 flex-1">{sub.label}</span>
                         </button>
-                        {isExpanded && templates.length > 1 && (
-                          <div className="bg-[#0f0f0f]">
-                            {templates.map((t) => (
-                              <button
-                                key={`${t.type}-${t.label}`}
-                                className="w-full flex items-center gap-2 pl-6 pr-3 py-1.5 hover:bg-[#212121] text-left transition-colors"
-                                onClick={() => onSelect(t.type, t.label)}
-                              >
-                                <span className="text-[12px] text-zinc-400">{t.label}</span>
-                              </button>
-                            ))}
-                          </div>
-                        )}
-                      </div>
+                      );
+                    }
+                    return (
+                      <SubMenuItem
+                        key={sub.label}
+                        label={sub.label}
+                        templates={templates}
+                        isHovered={hoveredSub === sub.label}
+                        onHover={() => setHoveredSub(sub.label)}
+                        onLeave={() => setHoveredSub(null)}
+                        onSelect={handleSelect}
+                        flyoutLeft={flyoutLeft}
+                      />
                     );
                   })}
                 </div>
               );
             })}
-
-            {/* Essentials / Utility that don't fit in sections */}
-            {groupedByCategory.has('Essentials') && (
-              <div className="mb-1">
-                <div className="px-3 py-1 text-[10px] font-medium text-zinc-500 uppercase tracking-wider">Essentials</div>
-                {groupedByCategory.get('Essentials')!.map((t) => (
-                  <button
-                    key={`${t.type}-${t.label}`}
-                    className="w-full flex items-center gap-2 px-3 py-2 hover:bg-[#212121] text-left transition-colors"
-                    onClick={() => onSelect(t.type, t.label)}
-                  >
-                    <span className="text-[13px] text-zinc-300">{t.label}</span>
-                  </button>
-                ))}
-              </div>
-            )}
           </>
         )}
       </div>
+    </div>
+  );
+}
+
+/** Subcategory row with flyout submenu on hover */
+function SubMenuItem({
+  label,
+  templates,
+  isHovered,
+  onHover,
+  onLeave,
+  onSelect,
+  flyoutLeft,
+}: {
+  label: string;
+  templates: { type: FlowNodeType; label: string }[];
+  isHovered: boolean;
+  onHover: () => void;
+  onLeave: () => void;
+  onSelect: (type: FlowNodeType, templateLabel: string) => void;
+  flyoutLeft: boolean;
+}) {
+  const rowRef = useRef<HTMLDivElement>(null);
+  const [flyoutPos, setFlyoutPos] = useState<{ top: number; left: number } | null>(null);
+
+  useEffect(() => {
+    if (isHovered && rowRef.current) {
+      const rect = rowRef.current.getBoundingClientRect();
+      const left = flyoutLeft ? rect.left - 224 : rect.right + 4;
+      // Estimate flyout height: header (32px) + items (40px each) + padding (16px)
+      const estimatedH = 32 + templates.length * 40 + 16;
+      const top = rect.top + estimatedH > window.innerHeight
+        ? Math.max(8, window.innerHeight - estimatedH - 8)
+        : rect.top;
+      setFlyoutPos({ top, left });
+    }
+  }, [isHovered, flyoutLeft, templates.length]);
+
+  return (
+    <div
+      ref={rowRef}
+      onMouseEnter={onHover}
+      onMouseLeave={onLeave}
+    >
+      <button className="w-full flex items-center gap-2 px-3 py-2 hover:bg-[#212121] text-left transition-colors">
+        <span className="text-[13px] text-zinc-300 flex-1">{label}</span>
+        <ChevronRight size={14} className="text-zinc-500" />
+      </button>
+      {isHovered && flyoutPos && (
+        <div
+          className="fixed z-[10000] bg-[#1a1a1a] border border-[#333] rounded-xl shadow-2xl min-w-[220px] max-h-[360px] overflow-y-auto"
+          style={{ top: flyoutPos.top - 8, left: flyoutPos.left, padding: '8px 0' }}
+          onMouseEnter={onHover}
+          onMouseLeave={onLeave}
+        >
+          <div className="px-3 py-1.5 text-[11px] font-medium text-zinc-500">{label}</div>
+          {templates.map((t) => (
+            <button
+              key={`${t.type}-${t.label}`}
+              className="w-full flex items-center gap-2 px-3 py-2 hover:bg-[#252525] text-left transition-colors"
+              onClick={() => onSelect(t.type, t.label)}
+            >
+              <span className="text-[13px] text-zinc-300">{t.label}</span>
+            </button>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

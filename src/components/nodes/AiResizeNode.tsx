@@ -8,6 +8,7 @@ import { ensureRemoteUrl } from '@/lib/executeNode';
 import { useFlowStore } from '@/store/flowStore';
 import { Scaling, Play, Loader } from 'lucide-react';
 import { ResultNavOverlay } from '@/components/nodes/ResultNavOverlay';
+import { NodeQuickActions } from './NodeQuickActions';
 
 type AspectRatio = '1:1' | '3:4' | '4:3' | '2:3' | '3:2' | '4:5' | '5:4' | '9:16' | '16:9' | '21:9';
 
@@ -165,7 +166,7 @@ export function AiResizeNode(props: NodeProps) {
   const resultUrl = resultMeta && !isPreview ? resultMeta.content : null;
 
   return (
-    <div
+    <NodeQuickActions nodeId={id} selected={selected} data={data}
       className="group relative flex flex-col items-center gap-1"
       style={{ width: 356 }}
       onClick={() => selectNode(id)}
@@ -404,6 +405,6 @@ export function AiResizeNode(props: NodeProps) {
           </div>
         </div>
       </div>
-    </div>
+    </NodeQuickActions>
   );
 }

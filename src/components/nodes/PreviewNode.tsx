@@ -6,6 +6,7 @@ import { FlowNodeData, HANDLE_COLORS, resolveFileHandleColor } from '@/lib/types
 import { resolveInput } from '@/lib/resolveInput';
 import { useFlowStore } from '@/store/flowStore';
 import { ScanLine, Play, Pause, Volume2, VolumeOff } from 'lucide-react';
+import { NodeQuickActions } from './NodeQuickActions';
 
 export function PreviewNode(props: NodeProps) {
   const { id, selected } = props;
@@ -205,7 +206,7 @@ export function PreviewNode(props: NodeProps) {
   };
 
   return (
-    <div
+    <NodeQuickActions nodeId={id} selected={selected} data={data}
       className="group relative flex flex-col items-center gap-1"
       style={{ width: contentSize ? contentSize.w + 36 : 356 }}
       onClick={() => selectNode(id)}
@@ -395,6 +396,6 @@ export function PreviewNode(props: NodeProps) {
           )}
         </div>
       </div>
-    </div>
+    </NodeQuickActions>
   );
 }

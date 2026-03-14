@@ -5,6 +5,7 @@ import { Handle, Position, useEdges, useNodes, type NodeProps } from '@xyflow/re
 import { FlowNodeData, HANDLE_COLORS, resolveFileHandleColor } from '@/lib/types';
 import { useFlowStore } from '@/store/flowStore';
 import { IterationCcw, Plus } from 'lucide-react';
+import { NodeQuickActions } from './NodeQuickActions';
 
 const HANDLE_SIZE = 18;
 const HEADER_OFFSET = 68;
@@ -187,7 +188,7 @@ export function VideoIteratorNode(props: NodeProps) {
   }, [id, getVideos]);
 
   return (
-    <div
+    <NodeQuickActions nodeId={id} selected={selected} data={data}
       className="group relative flex flex-col items-center gap-1"
       style={{ width: 360 }}
       onClick={() => selectNode(id)}
@@ -361,6 +362,6 @@ export function VideoIteratorNode(props: NodeProps) {
           </button>
         </div>
       </div>
-    </div>
+    </NodeQuickActions>
   );
 }

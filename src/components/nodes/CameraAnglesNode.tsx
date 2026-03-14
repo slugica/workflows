@@ -7,6 +7,7 @@ import { resolveInputImageUrl } from '@/lib/resolveInput';
 import { ensureRemoteUrl } from '@/lib/executeNode';
 import { useFlowStore } from '@/store/flowStore';
 import { Camera, Play, Loader, ChevronLeft, ChevronRight, Trash2 } from 'lucide-react';
+import { NodeQuickActions } from './NodeQuickActions';
 
 /* ─── Prompt generation helpers for camera angle ─── */
 function getRotationPrompt(az: number): string {
@@ -167,7 +168,7 @@ export function CameraAnglesNode(props: NodeProps) {
   const resultUrl = resultMeta?.format !== 'preview' ? resultMeta?.content : null;
 
   return (
-    <div
+    <NodeQuickActions nodeId={id} selected={selected} data={data}
       className="group relative flex flex-col items-center gap-1"
       style={{ width: 356 }}
       onClick={() => selectNode(id)}
@@ -404,6 +405,6 @@ export function CameraAnglesNode(props: NodeProps) {
           </div>
         </div>
       </div>
-    </div>
+    </NodeQuickActions>
   );
 }

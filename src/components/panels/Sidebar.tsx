@@ -4,11 +4,11 @@ import { useState, useRef, type ReactNode } from 'react';
 import { useReactFlow } from '@xyflow/react';
 import { NODE_TEMPLATES, FlowNodeType } from '@/lib/types';
 import { useFlowStore } from '@/store/flowStore';
-import { Upload, Type, ImageIcon, Video, AudioLines, Bot, Zap, Pencil, Search, Wrench, Crop, Download, ScanLine, Droplets, Scaling, SlidersHorizontal, Settings2, Grid2x2, IterationCcw, Sun, Camera, Film, Scissors, AudioWaveform, Combine } from 'lucide-react';
+import { Upload, Type, ImageIcon, Video, AudioLines, Bot, Zap, Pencil, Search, Wrench, Crop, Download, ScanLine, Droplets, Scaling, SlidersHorizontal, Settings2, Grid2x2, IterationCcw, Sun, Camera, Film, Scissors, AudioWaveform, Combine, Eye } from 'lucide-react';
 
 // ── Quick-add buttons (top section) ──────────────────────────────────────────
 
-const QUICK_ADD: { label: string; type: FlowNodeType; templateLabel: string; icon: ReactNode; shortcut: string }[] = [
+const QUICK_ADD: { label: string; type: FlowNodeType; templateLabel: string; icon: ReactNode; shortcut?: string }[] = [
   { label: 'Upload', type: 'import', templateLabel: 'Upload', icon: <Upload size={14} />, shortcut: 'U' },
   { label: 'Prompt', type: 'prompt', templateLabel: 'Prompt', icon: <Type size={14} />, shortcut: 'P' },
   { label: 'Image', type: 'image', templateLabel: 'Nano Banana 2 (Gemini)', icon: <ImageIcon size={14} />, shortcut: 'I' },
@@ -29,12 +29,6 @@ interface Section {
 }
 
 const SECTIONS: Section[] = [
-  {
-    label: 'Essentials',
-    subs: [
-      { label: 'Essentials', icon: <Zap size={14} />, categories: ['Essentials'] },
-    ],
-  },
   {
     label: 'Image',
     subs: [
@@ -157,10 +151,52 @@ export function Sidebar() {
                   {item.icon}
                 </span>
                 <span className="text-sm text-zinc-300 flex-1">{item.label}</span>
-                <span className="text-[11px] text-zinc-600 font-mono">{item.shortcut}</span>
+                {item.shortcut && <span className="text-[11px] text-zinc-600 font-mono">{item.shortcut}</span>}
               </button>
             ))}
           </div>
+
+          {/* Essentials accordion inside Add */}
+          {(() => {
+            const essentialsOrder = ['Import', 'Export', 'Preview'];
+            const essentials = essentialsOrder
+              .map((label) => NODE_TEMPLATES.find((t) => t.category === 'Essentials' && t.label === label))
+              .filter(Boolean) as typeof NODE_TEMPLATES;
+            if (essentials.length === 0) return null;
+            const isOpen = openSubs.has('Essentials');
+            return (
+              <div className="mt-1">
+                <button
+                  className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-[#212121]/70 transition-colors text-left group ${isOpen ? 'bg-[#212121]/50' : ''}`}
+                  onClick={() => toggleSub('Essentials')}
+                >
+                  <span className="w-8 h-8 rounded-lg bg-[#212121] flex items-center justify-center text-sm group-hover:bg-[#2a2a2a] transition-colors">
+                    <Zap size={14} />
+                  </span>
+                  <span className="text-sm text-zinc-300 flex-1">Essentials</span>
+                  <svg
+                    className={`w-4 h-4 text-zinc-500 transition-transform ${isOpen ? 'rotate-180' : ''}`}
+                    fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}
+                  >
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+                  </svg>
+                </button>
+                {isOpen && (
+                  <div className="pl-4 pr-2 pb-1">
+                    {essentials.map((t) => (
+                      <ModelItem
+                        key={`${t.type}-${t.label}`}
+                        label={t.label}
+                        type={t.type}
+                        onAdd={() => handleAdd(t.type, t.label)}
+                        onDragStart={(e) => handleDragStart(e, t.type, t.label)}
+                      />
+                    ))}
+                  </div>
+                )}
+              </div>
+            );
+          })()}
         </div>
 
         {/* Sections with subcategories */}
@@ -185,23 +221,6 @@ export function Sidebar() {
                 if (templates.length === 0) return null;
 
                 const isOpen = openSubs.has(sub.label);
-
-                // If subcategory has only static nodes (Essentials, Text), show them inline
-                const isSimple = templates.length <= 2 && section.label === 'Essentials';
-                if (isSimple) {
-                  return templates.map((t) => (
-                    <button
-                      key={`${t.type}-${t.label}`}
-                      className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-[#212121]/70 transition-colors text-left group"
-                      onClick={() => handleAdd(t.type, t.label)}
-                    >
-                      <span className="w-8 h-8 rounded-lg bg-[#212121] flex items-center justify-center text-sm group-hover:bg-[#2a2a2a] transition-colors">
-                        {sub.icon}
-                      </span>
-                      <span className="text-sm text-zinc-300 flex-1">{t.label}</span>
-                    </button>
-                  ));
-                }
 
                 return (
                   <div key={sub.label}>

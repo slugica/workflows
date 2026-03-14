@@ -6,6 +6,7 @@ import { FlowNodeData, HANDLE_COLORS, resolveFileHandleColor } from '@/lib/types
 import { resolveInput } from '@/lib/resolveInput';
 import { useFlowStore } from '@/store/flowStore';
 import { Scissors, Play, Pause, Volume2, VolumeX, Undo2, Redo2, SplitSquareHorizontal, ArrowLeftToLine, ArrowRightToLine } from 'lucide-react';
+import { NodeQuickActions } from './NodeQuickActions';
 
 interface Segment {
   id: string;
@@ -438,7 +439,7 @@ export function TrimVideoNode(props: NodeProps) {
   };
 
   return (
-    <div
+    <NodeQuickActions nodeId={id} selected={selected} data={data}
       className="group relative flex flex-col items-center gap-1" style={{ width: 480 }}
       onClick={() => selectNode(id)}
     >
@@ -739,6 +740,6 @@ export function TrimVideoNode(props: NodeProps) {
           )}
         </div>
       </div>
-    </div>
+    </NodeQuickActions>
   );
 }

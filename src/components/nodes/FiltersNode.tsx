@@ -7,6 +7,7 @@ import { resolveInput } from '@/lib/resolveInput';
 import { useFlowStore } from '@/store/flowStore';
 import { SlidersHorizontal, RotateCcw } from 'lucide-react';
 import { VideoPreviewPlayer } from './VideoPreviewPlayer';
+import { NodeQuickActions } from './NodeQuickActions';
 
 interface FilterValues {
   exposure: number;    // -100..+100, neutral 0
@@ -192,7 +193,7 @@ export function FiltersNode(props: NodeProps) {
   const videoCssFilter = `brightness(${1 + committed.exposure / 100}) contrast(${1 + committed.contrast / 100}) saturate(${1 + committed.saturation / 100})`;
 
   return (
-    <div
+    <NodeQuickActions nodeId={id} selected={selected} data={data}
       className="group relative flex flex-col items-center gap-1"
       style={{ width: contentSize ? contentSize.w + 36 : 356 }}
       onClick={() => selectNode(id)}
@@ -371,6 +372,6 @@ export function FiltersNode(props: NodeProps) {
           </div>
         </div>
       </div>
-    </div>
+    </NodeQuickActions>
   );
 }
