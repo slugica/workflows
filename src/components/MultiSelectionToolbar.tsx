@@ -20,6 +20,7 @@ import {
   ChevronDown,
 } from 'lucide-react';
 import type { FlowNodeData } from '@/lib/types';
+import { theme } from '@/lib/theme';
 
 const ALIGN_OPTIONS = [
   { key: 'left', icon: <AlignHorizontalJustifyStart size={16} />, label: 'Align Left' },
@@ -137,17 +138,18 @@ export function MultiSelectionToolbar() {
   const screenX = screenPos.x;
   const screenY = screenPos.y - 16; // 16px above selection
 
-  const btnClass = 'w-9 h-9 flex items-center justify-center rounded-full text-zinc-400 hover:text-white hover:bg-[#333] transition-colors';
+  const btnClass = 'w-8 h-8 flex items-center justify-center rounded-full text-zinc-400 hover:text-white hover:bg-[#333] transition-colors';
 
   return (
     <div
       ref={toolbarRef}
-      className="fixed z-[9990] flex items-center gap-1 bg-[#1a1a1a] border border-[#333] rounded-full px-2 py-1.5 nodrag"
+      className="fixed z-[9990] flex items-center gap-1 rounded-full px-2 py-1.5 nodrag"
       style={{
+        background: theme.toolbarBg,
+        border: `1px solid ${theme.toolbarBorder}`,
         left: screenX,
         top: screenY,
-        transform: `translate(-50%, -100%) scale(${1 / zoom})`,
-        transformOrigin: 'bottom center',
+        transform: 'translate(-50%, -100%)',
       }}
       onClick={(e) => e.stopPropagation()}
     >
@@ -172,11 +174,11 @@ export function MultiSelectionToolbar() {
           <ChevronDown size={10} className="ml-0.5" />
         </button>
         {alignOpen && (
-          <div className="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 bg-[#1a1a1a] border border-[#333] rounded-xl py-1 shadow-xl flex items-center gap-0.5 px-1.5">
+          <div className="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 rounded-xl py-1 shadow-xl flex items-center gap-0.5 px-1.5" style={{ background: theme.toolbarBg, border: `1px solid ${theme.toolbarBorder}` }}>
             {ALIGN_OPTIONS.map((opt) => (
               <button
                 key={opt.key}
-                className="w-9 h-9 flex items-center justify-center rounded-lg text-zinc-400 hover:text-white hover:bg-[#333] transition-colors"
+                className="w-8 h-8 flex items-center justify-center rounded-lg text-zinc-400 hover:text-white hover:bg-[#333] transition-colors"
                 title={opt.label}
                 onClick={() => {
                   alignNodes(selectedIds, opt.key);
@@ -198,9 +200,9 @@ export function MultiSelectionToolbar() {
       {/* Run Selected — only if any runnable node */}
       {hasRunnable && (
         <>
-          <div className="w-px h-5 bg-[#333] mx-0.5" />
+          <div className="w-px h-5 mx-0.5" style={{ background: theme.border3 }} />
           <button
-            className="flex items-center gap-1.5 px-3 h-9 rounded-full text-zinc-300 hover:text-white hover:bg-[#333] transition-colors text-[13px]"
+            className="flex items-center gap-1.5 px-3 h-8 rounded-full text-zinc-300 hover:text-white hover:bg-[#333] transition-colors text-[13px]"
             title="Run Selected"
             onClick={handleRunSelected}
           >

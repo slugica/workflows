@@ -259,9 +259,9 @@ export const useFlowStore = create<FlowState>((set, get) => ({
     if (!sourceNode) return;
     const sourceData = sourceNode.data as unknown as FlowNodeData;
 
-    // Find source output handle (prefer file/image/video)
+    // Find source output handle
     const sourceOutput = sourceData.handles.outputs.find(
-      (h) => h.type === 'file' || h.type === 'image' || h.type === 'video'
+      (h) => h.type === 'file' || h.type === 'image' || h.type === 'video' || h.type === 'text' || h.type === 'audio'
     );
     if (!sourceOutput) return;
 

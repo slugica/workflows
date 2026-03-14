@@ -61,14 +61,6 @@ export const theme = {
     gap: 8,
   },
 
-  // ── Buttons ──
-  btnRunHeight:    40,
-  btnRunRadius:    16,
-  btnRunBorder:    '#292929',
-  btnIconSize:     32,
-  btnIconRadius:   '9999px',   // fully round
-  btnResetRadius:  10,
-
   // ── Toolbars (floating: quick actions, section, multi-select) ──
   toolbarBg:       '#1a1a1a',
   toolbarBorder:   '#333333',
@@ -108,11 +100,3 @@ export const theme = {
     '#06b6d4', // cyan
   ],
 } as const;
-
-// ── Tailwind-compatible class fragments ──
-// Use these in className strings for common patterns
-
-export const nodeCardClasses = {
-  base: `bg-[${theme.surface1}] rounded-[${theme.nodeRadius}px] border-[${theme.nodeBorderWidth}] border-[${theme.border1}]`,
-  selected: `border-[rgba(255,255,255,0.3)]`,
-};

@@ -607,9 +607,11 @@ export function LevelsNode(props: NodeProps) {
 
           {/* Histogram with draggable indicator lines */}
           <div
+            ref={histTrackRef}
             className="mt-2 self-stretch relative nodrag select-none touch-none"
             onPointerMove={(e) => {
               if (!histDragRef.current || !histTrackRef.current) return;
+              e.stopPropagation();
               const rect = histTrackRef.current.getBoundingClientRect();
               const pct = ((e.clientX - rect.left) / rect.width) * 100;
               const val = percentToVal(pct);
@@ -624,33 +626,40 @@ export function LevelsNode(props: NodeProps) {
                 });
               }
             }}
-            onPointerUp={() => { if (histDragRef.current) { histDragRef.current = null; commitLevels(); } }}
+            onPointerUp={(e) => {
+              if (histDragRef.current) {
+                e.stopPropagation();
+                histDragRef.current = null;
+                histTrackRef.current?.releasePointerCapture(e.pointerId);
+                commitLevels();
+              }
+            }}
           >
             <canvas ref={histCanvasRef} width={256} height={48} className="w-full h-12 rounded-xl border-none" style={{ backgroundColor: theme.surface2 }} />
-            <div ref={histTrackRef} className="absolute inset-0" style={{ margin: '1px' }}>
+            <div className="absolute inset-0" style={{ margin: '1px' }}>
               {/* Shadow line */}
               <div
                 className="absolute top-0 bottom-0 cursor-ew-resize"
                 style={{ left: `${(levels.shadowIn / 255) * 100}%`, width: 7, transform: 'translateX(-3px)' }}
-                onPointerDown={(e) => { e.preventDefault(); e.stopPropagation(); histDragRef.current = 'shadow'; (e.target as HTMLElement).setPointerCapture(e.pointerId); }}
+                onPointerDown={(e) => { e.preventDefault(); e.stopPropagation(); histDragRef.current = 'shadow'; histTrackRef.current?.setPointerCapture(e.pointerId); }}
               >
-                <div className="absolute left-[3px] top-0 bottom-0 w-px bg-white/50" />
+                <div className="absolute left-[3px] top-0 bottom-0 w-px bg-white/50 pointer-events-none" />
               </div>
               {/* Gamma line */}
               <div
                 className="absolute top-0 bottom-0 cursor-ew-resize"
                 style={{ left: `${(gammaSliderPos / 255) * 100}%`, width: 7, transform: 'translateX(-3px)' }}
-                onPointerDown={(e) => { e.preventDefault(); e.stopPropagation(); histDragRef.current = 'gamma'; (e.target as HTMLElement).setPointerCapture(e.pointerId); }}
+                onPointerDown={(e) => { e.preventDefault(); e.stopPropagation(); histDragRef.current = 'gamma'; histTrackRef.current?.setPointerCapture(e.pointerId); }}
               >
-                <div className="absolute left-[3px] top-0 bottom-0 w-px bg-white/30" />
+                <div className="absolute left-[3px] top-0 bottom-0 w-px bg-white/30 pointer-events-none" />
               </div>
               {/* Highlight line */}
               <div
                 className="absolute top-0 bottom-0 cursor-ew-resize"
                 style={{ left: `${(levels.highlightIn / 255) * 100}%`, width: 7, transform: 'translateX(-3px)' }}
-                onPointerDown={(e) => { e.preventDefault(); e.stopPropagation(); histDragRef.current = 'highlight'; (e.target as HTMLElement).setPointerCapture(e.pointerId); }}
+                onPointerDown={(e) => { e.preventDefault(); e.stopPropagation(); histDragRef.current = 'highlight'; histTrackRef.current?.setPointerCapture(e.pointerId); }}
               >
-                <div className="absolute left-[3px] top-0 bottom-0 w-px bg-white/50" />
+                <div className="absolute left-[3px] top-0 bottom-0 w-px bg-white/50 pointer-events-none" />
               </div>
             </div>
           </div>

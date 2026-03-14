@@ -83,6 +83,7 @@ function detectMediaColor(nodeData: FlowNodeData): string | null {
       const entry = Object.values(result)[0];
       if (entry?.format === 'video') return HANDLE_COLORS.video;
       if (entry?.format === 'image') return HANDLE_COLORS.image;
+      if (entry?.format === 'audio') return HANDLE_COLORS.audio;
     }
   }
   return null;

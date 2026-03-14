@@ -19,7 +19,7 @@ export function NodeNumberInput({ variant = 'default', className = '', ...props 
   return (
     <input
       type="number"
-      className={`text-white text-center focus:outline-none focus:border-zinc-500 nodrag [&::-webkit-inner-spin-button]:appearance-none ${className}`}
+      className={`text-white text-center focus:outline-none focus:border-zinc-500 nodrag [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none ${className}`}
       style={{
         backgroundColor: theme.surface2,
         border: 'none',
@@ -52,10 +52,11 @@ interface NodeSelectProps {
 
 export function NodeSelect({ options, value, onValueChange, fullWidth, disabled, className = '' }: NodeSelectProps) {
   const spec = theme.control.select;
-  const selectedLabel = options.find(o => o.value === String(value))?.label ?? value;
+  const safeValue = value != null ? String(value) : options[0]?.value ?? '';
+  const selectedLabel = options.find(o => o.value === safeValue)?.label ?? safeValue;
 
   return (
-    <Select.Root value={String(value)} onValueChange={onValueChange} disabled={disabled}>
+    <Select.Root value={safeValue} onValueChange={onValueChange} disabled={disabled}>
       <Select.Trigger
         className={`node-select-trigger flex items-center justify-between text-white nodrag outline-none ${fullWidth ? 'flex-1 min-w-0' : ''} ${disabled ? 'opacity-40 cursor-not-allowed' : 'cursor-pointer'} ${className}`}
         style={{
@@ -126,9 +127,10 @@ export function NodeSlider({ className = '', value, min, max, ...props }: NodeSl
   const numVal = Number(value ?? 0);
   const numMin = Number(min ?? 0);
   const numMax = Number(max ?? 100);
-  const pct = ((numVal - numMin) / (numMax - numMin)) * 100;
+  const range = numMax - numMin;
+  const pct = range > 0 ? ((numVal - numMin) / range) * 100 : 0;
   // Center point as percentage (where 0 falls on -100..100 range)
-  const centerPct = ((0 - numMin) / (numMax - numMin)) * 100;
+  const centerPct = range > 0 ? ((0 - numMin) / range) * 100 : 0;
   const hasCenter = numMin < 0 && numMax > 0;
 
   let bg: string;
@@ -232,7 +234,7 @@ export function NodeLabel({ children, width }: { children: ReactNode; width?: nu
 // Standard horizontal layout for a row of controls
 export function NodeControlsRow({ children, className = '' }: { children: ReactNode; className?: string }) {
   return (
-    <div className={`flex items-center self-stretch ${className}`} style={{ gap: theme.control.gap, marginTop: 12 }}>
+    <div className={`flex items-center self-stretch ${className}`} style={{ gap: theme.control.gap, marginTop: theme.control.gap + 4 }}>
       {children}
     </div>
   );
