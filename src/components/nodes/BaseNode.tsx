@@ -9,7 +9,7 @@ import { Upload, Type, ImageIcon, Video, AudioLines, Play, Loader, Plus } from '
 import { MediaPreview, type MediaItem } from '@/components/nodes/MediaPreview';
 import { QuickActionsBar, type QuickActionMode } from '@/components/nodes/QuickActionsBar';
 import { theme } from '@/lib/theme';
-import { uploadFile } from '@/lib/uploadFile';
+import { uploadFile, detectFileAspectRatio, settingToAspectRatio } from '@/lib/uploadFile';
 
 const TYPE_ICONS: Record<string, ReactNode> = {
   import: <Upload size={18} />,
@@ -71,10 +71,27 @@ export function BaseNode(props: NodeProps) {
   // Compute content area size like Imagine: max 480x427, min 320x320
   const [imgNatural, setImgNatural] = useState<{ w: number; h: number } | null>(null);
   const contentSize = useMemo(() => {
-    if (!imgNatural) return null;
+    // Use actual image dimensions if available, otherwise fall back to previewAspectRatio
+    let ratio: number | null = null;
+    if (imgNatural) {
+      ratio = imgNatural.w / imgNatural.h;
+    } else {
+      const ar = data.settings.previewAspectRatio as string | undefined;
+      if (ar) {
+        const parts = ar.split('/');
+        if (parts.length === 2) ratio = Number(parts[0]) / Number(parts[1]);
+      }
+      // Also check AI node aspect ratio settings
+      if (!ratio && data.behavior === 'dynamic') {
+        const cssAr = settingToAspectRatio(data.settings);
+        if (cssAr) {
+          const parts = cssAr.split('/');
+          if (parts.length === 2) ratio = Number(parts[0]) / Number(parts[1]);
+        }
+      }
+    }
+    if (!ratio || !isFinite(ratio)) return null;
     const MAX_W = 480, MAX_H = 427;
-    const { w, h } = imgNatural;
-    const ratio = w / h;
     let cw = MAX_W;
     let ch = cw / ratio;
     if (ch > MAX_H) {
@@ -82,7 +99,7 @@ export function BaseNode(props: NodeProps) {
       cw = ch * ratio;
     }
     return { w: Math.round(cw), h: Math.round(ch) };
-  }, [imgNatural]);
+  }, [imgNatural, data.settings.previewAspectRatio, data.behavior, data.settings.aspect_ratio, data.settings.image_size]);
 
   const [uploadError, setUploadError] = useState<string | null>(null);
 
@@ -93,11 +110,16 @@ export function BaseNode(props: NodeProps) {
       return;
     }
     setUploadError(null);
+
+    // Detect aspect ratio before showing shimmer
+    const ar = await detectFileAspectRatio(file);
+
     const store = useFlowStore.getState();
     const localUrl = URL.createObjectURL(file);
     store.updateNodeSetting(id, 'fileName', file.name);
     store.updateNodeSetting(id, 'fileUrl', localUrl);
     store.updateNodeSetting(id, 'fileType', file.type);
+    if (ar) store.updateNodeSetting(id, 'previewAspectRatio', ar);
     store.updateNodeSetting(id, 'uploading', true);
 
     try {
@@ -133,7 +155,9 @@ export function BaseNode(props: NodeProps) {
       existing.push({ file: { content: curData.settings.fileUrl as string, format: curFmt, ...(firstThumb ? { thumbnail: firstThumb } : {}) } });
     }
     const placeholderIdx = existing.length;
-    const withPlaceholder = [...existing, { file: { content: '', format, loading: true } }];
+    // Detect aspect ratio for loading shimmer
+    const fileAr = await detectFileAspectRatio(file);
+    const withPlaceholder = [...existing, { file: { content: '', format, loading: true, ...(fileAr ? { aspectRatio: fileAr } : {}) } }];
     store0.updateNodeData(id, { results: withPlaceholder, selectedResultIndex: placeholderIdx, status: 'done' });
 
     try {
@@ -168,6 +192,7 @@ export function BaseNode(props: NodeProps) {
   // Build unified media items for import nodes
   const importItems = useMemo((): MediaItem[] => {
     if (nodeType !== 'import') return [];
+    const fileAr = data.settings.previewAspectRatio as string | undefined;
     // If we have results array (multiple files), use that
     if (data.results && data.results.length > 0) {
       return data.results.map(r => {
@@ -178,6 +203,7 @@ export function BaseNode(props: NodeProps) {
           loading: !!entry?.loading,
           label: data.settings.fileName as string | undefined,
           thumbnail: entry?.thumbnail as string | undefined,
+          aspectRatio: entry?.aspectRatio as string | undefined || fileAr,
         };
       });
     }
@@ -191,20 +217,31 @@ export function BaseNode(props: NodeProps) {
         loading: !!data.settings.uploading,
         label: data.settings.fileName as string | undefined,
         thumbnail: data.settings.videoThumbnail as string | undefined,
+        aspectRatio: fileAr,
       }];
     }
     return [];
-  }, [nodeType, data.results, data.settings.fileUrl, data.settings.fileType, data.settings.uploading, data.settings.fileName, data.settings.videoThumbnail]);
+  }, [nodeType, data.results, data.settings.fileUrl, data.settings.fileType, data.settings.uploading, data.settings.fileName, data.settings.videoThumbnail, data.settings.previewAspectRatio]);
+
+  // Compute preview aspect ratio from AI node settings
+  const aiPreviewAspectRatio = useMemo((): string | undefined => {
+    if (data.behavior !== 'dynamic') return undefined;
+    return settingToAspectRatio(data.settings);
+  }, [data.behavior, data.settings]);
 
   // Build unified media items for AI result nodes
   const aiItems = useMemo((): MediaItem[] => {
     if (nodeType === 'import' || !data.results?.length) return [];
     return data.results.map(r => {
       const entry = Object.values(r)[0];
+      const isDraft = !!entry?.draft;
+      const isLoading = !!entry?.loading;
       return {
         content: entry?.content || '',
         format: (entry?.format === 'video' ? 'video' : entry?.format === 'audio' ? 'audio' : 'image') as MediaItem['format'],
-        loading: !!entry?.loading,
+        loading: isLoading,
+        draft: isDraft,
+        aspectRatio: (entry?.aspectRatio as string | undefined) || undefined,
       };
     });
   }, [nodeType, data.results]);
@@ -546,7 +583,8 @@ export function BaseNode(props: NodeProps) {
               selectedIndex={data.selectedResultIndex || 0}
               onNavigate={handleAiNavigate}
               onDelete={handleAiDelete}
-              emptyState={data.status === 'running' ? 'shimmer' : 'checkerboard'}
+              emptyAspectRatio={aiPreviewAspectRatio}
+              alwaysShowControls
             />
           </div>
         ) : null}
@@ -560,7 +598,7 @@ export function BaseNode(props: NodeProps) {
                   ? 'bg-yellow-900/50 text-yellow-400 cursor-wait border border-yellow-700/50'
                   : missingRequiredInputs.length > 0
                     ? 'bg-transparent text-zinc-600 cursor-not-allowed'
-                    : 'bg-transparent text-white'
+                    : 'bg-transparent text-white hover:bg-white/10'
               }`}
               style={
                 data.status === 'running' ? undefined

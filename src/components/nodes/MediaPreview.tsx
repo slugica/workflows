@@ -8,9 +8,13 @@ export interface MediaItem {
   content: string;
   format: 'image' | 'video' | 'audio';
   loading?: boolean;
+  /** Draft slot — prepared for next generation, shows checkerboard */
+  draft?: boolean;
   label?: string;
   /** Thumbnail data URL for video preview */
   thumbnail?: string;
+  /** CSS aspect-ratio for loading shimmer / draft (e.g. "16/9") */
+  aspectRatio?: string;
 }
 
 export interface MediaPreviewProps {
@@ -25,6 +29,8 @@ export interface MediaPreviewProps {
   emptyHeight?: number;
   /** Aspect ratio for empty state (overrides emptyHeight), e.g. "16/9" */
   emptyAspectRatio?: string;
+  /** Always show counter + delete (for AI nodes) */
+  alwaysShowControls?: boolean;
 }
 
 export function MediaPreview({
@@ -36,6 +42,7 @@ export function MediaPreview({
   emptyState = 'checkerboard',
   emptyHeight = 320,
   emptyAspectRatio,
+  alwaysShowControls = false,
 }: MediaPreviewProps) {
   const [playingVideo, setPlayingVideo] = useState<string | null>(null);
 
@@ -88,8 +95,10 @@ export function MediaPreview({
                     onLoad={(e) => onImageLoad?.(e.currentTarget.naturalWidth, e.currentTarget.naturalHeight)}
                   />
                 )}
-                <div className="shimmer w-full" style={{ aspectRatio: '1' }} />
+                <div className="shimmer w-full" style={{ aspectRatio: item.aspectRatio || '1' }} />
               </>
+            ) : item.draft ? (
+              <div className="checkerboard w-full" style={{ aspectRatio: item.aspectRatio || '1', backgroundColor: theme.previewBg }} />
             ) : item.format === 'video' ? (
               // Video: thumbnail image with play button, click to play (like Imagine.art)
               playingVideo === item.content && isSelected ? (
@@ -119,7 +128,7 @@ export function MediaPreview({
                   )}
                   {/* Play button overlay */}
                   <div className="absolute inset-0 flex items-center justify-center">
-                    <div className="w-12 h-12 rounded-full bg-black/50 flex items-center justify-center backdrop-blur-sm">
+                    <div className="w-12 h-12 rounded-full bg-black/50 hover:bg-black/70 hover:scale-110 flex items-center justify-center backdrop-blur-sm transition-all duration-200">
                       <Play size={20} className="text-white ml-0.5" fill="white" />
                     </div>
                   </div>
@@ -145,45 +154,40 @@ export function MediaPreview({
         );
       })}
 
-      {/* Navigation overlay — only when multiple items */}
-      {items.length > 1 && (
-        <div className="absolute top-2 left-2 flex items-center gap-1 z-10 opacity-0 group-hover/preview:opacity-100 transition-opacity duration-200">
+      {/* Controls overlay: counter + nav + delete */}
+      {(alwaysShowControls || items.length > 1) && (
+        <div className={`absolute top-2 left-2 right-2 flex items-center justify-between z-10 ${alwaysShowControls ? '' : 'opacity-0 group-hover/preview:opacity-100'} transition-opacity duration-200`}>
+          {/* Navigation: arrows + counter */}
+          <div className="flex items-center gap-1">
+            {items.length > 1 && (
+              <button
+                className="w-7 h-7 rounded-full bg-black/60 hover:bg-black/80 flex items-center justify-center nodrag transition-colors"
+                onClick={(e) => { e.stopPropagation(); if (safeIndex > 0) onNavigate(safeIndex - 1); }}
+              >
+                <ChevronLeft size={14} className="text-white" />
+              </button>
+            )}
+            <span className="text-xs text-white font-medium px-1.5 py-0.5 rounded-full bg-black/60">
+              {safeIndex + 1}/{items.length}
+            </span>
+            {items.length > 1 && (
+              <button
+                className="w-7 h-7 rounded-full bg-black/60 hover:bg-black/80 flex items-center justify-center nodrag transition-colors"
+                onClick={(e) => { e.stopPropagation(); if (safeIndex < items.length - 1) onNavigate(safeIndex + 1); }}
+              >
+                <ChevronRight size={14} className="text-white" />
+              </button>
+            )}
+          </div>
+          {/* Delete */}
           <button
-            className="w-7 h-7 rounded-full bg-black/60 hover:bg-black/80 flex items-center justify-center nodrag transition-colors"
-            onClick={(e) => {
-              e.stopPropagation();
-              if (safeIndex > 0) onNavigate(safeIndex - 1);
-            }}
+            className="w-7 h-7 rounded-full bg-black/60 hover:bg-red-900/80 flex items-center justify-center nodrag transition-colors"
+            onClick={(e) => { e.stopPropagation(); onDelete(safeIndex); }}
           >
-            <ChevronLeft size={14} className="text-white" />
-          </button>
-          <span className="text-xs text-white font-medium px-1">
-            {safeIndex + 1}/{items.length}
-          </span>
-          <button
-            className="w-7 h-7 rounded-full bg-black/60 hover:bg-black/80 flex items-center justify-center nodrag transition-colors"
-            onClick={(e) => {
-              e.stopPropagation();
-              if (safeIndex < items.length - 1) onNavigate(safeIndex + 1);
-            }}
-          >
-            <ChevronRight size={14} className="text-white" />
+            <Trash2 size={12} className="text-white" />
           </button>
         </div>
       )}
-
-      {/* Delete button — always available on hover */}
-      <div className="absolute top-2 right-2 z-10 opacity-0 group-hover/preview:opacity-100 transition-opacity duration-200">
-        <button
-          className="w-7 h-7 rounded-full bg-black/60 hover:bg-red-900/80 flex items-center justify-center nodrag transition-colors"
-          onClick={(e) => {
-            e.stopPropagation();
-            onDelete(safeIndex);
-          }}
-        >
-          <Trash2 size={12} className="text-white" />
-        </button>
-      </div>
     </div>
   );
 }

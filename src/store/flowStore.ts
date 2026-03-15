@@ -12,7 +12,7 @@ import {
 } from '@xyflow/react';
 import { FlowNodeData, FlowNodeType, NODE_TEMPLATES, HandleDef, detectMediaType } from '@/lib/types';
 import { executeNode } from '@/lib/executeNode';
-import { uploadFile } from '@/lib/uploadFile';
+import { uploadFile, detectFileAspectRatio, settingToAspectRatio } from '@/lib/uploadFile';
 
 interface Snapshot {
   nodes: Node[];
@@ -71,6 +71,10 @@ function parseHandleType(handleId: string): string | null {
   return segments[1];
 }
 
+// Settings keys that are internal (upload state, etc.) — don't trigger draft creation
+// Settings keys that should NOT trigger draft creation on AI nodes
+const INTERNAL_SETTING_KEYS = new Set(['uploading', 'fileUrl', 'fileType', 'fileName', 'remoteUrl', 'videoThumbnail', 'previewAspectRatio']);
+
 export const useFlowStore = create<FlowState>((set, get) => ({
   nodes: [],
   edges: [],
@@ -92,7 +96,14 @@ export const useFlowStore = create<FlowState>((set, get) => ({
   setConnectingHandleType: (type) => set({ connectingHandleType: type }),
 
   onNodesChange: (changes) => {
-    set({ nodes: applyNodeChanges(changes, get().nodes) });
+    const newNodes = applyNodeChanges(changes, get().nodes);
+    // Sync selectedNodeId when React Flow selection changes (e.g. drag-select)
+    const selectionChange = changes.find((c): c is { type: 'select'; id: string; selected: boolean } => c.type === 'select' && (c as { selected?: boolean }).selected === true);
+    const updates: Partial<FlowState> = { nodes: newNodes };
+    if (selectionChange) {
+      updates.selectedNodeId = selectionChange.id;
+    }
+    set(updates);
   },
 
   onEdgesChange: (changes) => {
@@ -641,6 +652,30 @@ export const useFlowStore = create<FlowState>((set, get) => ({
         };
       }),
     });
+
+    // Auto-create draft slot when generation settings change on AI nodes with results
+    if (!INTERNAL_SETTING_KEYS.has(key)) {
+      const node = get().nodes.find(n => n.id === id);
+      if (node) {
+        const data = node.data as unknown as FlowNodeData;
+        if (data.behavior === 'dynamic' && data.results && data.results.length > 0) {
+          const lastEntry = Object.values(data.results[data.results.length - 1])[0];
+          const newAr = settingToAspectRatio(data.settings) || '1/1';
+          if (lastEntry?.draft) {
+            // Update existing draft's aspect ratio
+            const newResults = [...data.results];
+            const lastKey = Object.keys(newResults[newResults.length - 1])[0];
+            newResults[newResults.length - 1] = { [lastKey]: { ...lastEntry, aspectRatio: newAr } };
+            get().updateNodeData(id, { results: newResults });
+          } else {
+            // Add new draft
+            const outputFormat = data.handles.outputs.some(h => h.type === 'video') ? 'video' : 'image';
+            const newResults = [...data.results, { _draft: { content: '', format: outputFormat, draft: true, aspectRatio: newAr } }];
+            get().updateNodeData(id, { results: newResults, selectedResultIndex: newResults.length - 1 });
+          }
+        }
+      }
+    }
   },
 
   deleteNode: (id) => {
@@ -675,27 +710,54 @@ export const useFlowStore = create<FlowState>((set, get) => ({
     const node = store.nodes.find((n) => n.id === id);
     if (!node) return;
 
-    // Set running status
-    store.updateNodeData(id, { status: 'running' });
-    const nodeName = (node.data as unknown as FlowNodeData).name || node.type || id;
+    const nodeData = node.data as unknown as FlowNodeData;
+    const nodeName = nodeData.name || node.type || id;
+    const outputFormat = nodeData.handles.outputs.some(h => h.type === 'video') ? 'video' : 'image';
+    const currentAr = settingToAspectRatio(nodeData.settings) || '1/1';
+
+    // Add loading placeholder to results queue immediately
+    const existingResults = [...(nodeData.results || [])];
+    const lastEntry = existingResults.length > 0 ? Object.values(existingResults[existingResults.length - 1])[0] : null;
+    // If last slot is a draft, replace it with loading (keep its aspect ratio); otherwise append
+    if (lastEntry?.draft) {
+      existingResults[existingResults.length - 1] = { _gen: { content: '', format: outputFormat, loading: true, aspectRatio: lastEntry.aspectRatio || currentAr } };
+    } else {
+      existingResults.push({ _gen: { content: '', format: outputFormat, loading: true, aspectRatio: currentAr } });
+    }
+    const loadingIdx = existingResults.length - 1;
+
+    store.updateNodeData(id, { status: 'running', results: existingResults, selectedResultIndex: loadingIdx });
 
     try {
       const result = await executeNode(id, get().nodes, get().edges);
       if (result.success && result.results) {
-        const currentData = (get().nodes.find(n => n.id === id)?.data as unknown as FlowNodeData);
-        const existingResults = currentData?.results || [];
-        const allResults = [...existingResults, ...result.results];
+        const currentResults = [...((get().nodes.find(n => n.id === id)?.data as unknown as FlowNodeData)?.results || [])];
+        // Replace loading placeholder with actual results
+        currentResults.splice(loadingIdx, 1, ...result.results);
         store.updateNodeData(id, {
           status: 'done',
-          results: allResults,
-          selectedResultIndex: allResults.length - 1,
+          results: currentResults,
+          selectedResultIndex: loadingIdx + result.results.length - 1,
         });
       } else {
-        store.updateNodeData(id, { status: 'idle' });
+        // Remove loading placeholder on error
+        const currentResults = [...((get().nodes.find(n => n.id === id)?.data as unknown as FlowNodeData)?.results || [])];
+        currentResults.splice(loadingIdx, 1);
+        store.updateNodeData(id, {
+          status: 'idle',
+          results: currentResults,
+          selectedResultIndex: Math.max(0, currentResults.length - 1),
+        });
         get().addToast(`${nodeName}: ${result.error || 'Unknown error'}`);
       }
     } catch (err) {
-      store.updateNodeData(id, { status: 'idle' });
+      const currentResults = [...((get().nodes.find(n => n.id === id)?.data as unknown as FlowNodeData)?.results || [])];
+      currentResults.splice(loadingIdx, 1);
+      store.updateNodeData(id, {
+        status: 'idle',
+        results: currentResults,
+        selectedResultIndex: Math.max(0, currentResults.length - 1),
+      });
       get().addToast(`${nodeName}: ${err instanceof Error ? err.message : String(err)}`);
     }
   },
@@ -715,20 +777,26 @@ export const useFlowStore = create<FlowState>((set, get) => ({
     s.updateNodeSetting(nodeId, 'fileName', file.name);
     s.updateNodeSetting(nodeId, 'fileUrl', localUrl);
     s.updateNodeSetting(nodeId, 'fileType', file.type);
-    s.updateNodeSetting(nodeId, 'uploading', true);
 
-    uploadFile(file)
-      .then(({ url, thumbnail }) => {
-        const st = useFlowStore.getState();
-        URL.revokeObjectURL(localUrl);
-        st.updateNodeSetting(nodeId, 'remoteUrl', url);
-        st.updateNodeSetting(nodeId, 'fileUrl', url);
-        if (thumbnail) st.updateNodeSetting(nodeId, 'videoThumbnail', thumbnail);
-      })
-      .catch((err) => console.error('Upload error:', err))
-      .finally(() => {
-        useFlowStore.getState().updateNodeSetting(nodeId, 'uploading', false);
-      });
+    // Detect aspect ratio before showing shimmer, then upload
+    detectFileAspectRatio(file).then((ar) => {
+      const st = useFlowStore.getState();
+      if (ar) st.updateNodeSetting(nodeId, 'previewAspectRatio', ar);
+      st.updateNodeSetting(nodeId, 'uploading', true);
+
+      uploadFile(file)
+        .then(({ url, thumbnail }) => {
+          const st2 = useFlowStore.getState();
+          URL.revokeObjectURL(localUrl);
+          st2.updateNodeSetting(nodeId, 'remoteUrl', url);
+          st2.updateNodeSetting(nodeId, 'fileUrl', url);
+          if (thumbnail) st2.updateNodeSetting(nodeId, 'videoThumbnail', thumbnail);
+        })
+        .catch((err) => console.error('Upload error:', err))
+        .finally(() => {
+          useFlowStore.getState().updateNodeSetting(nodeId, 'uploading', false);
+        });
+    });
   },
 
   pushUndo: () => {

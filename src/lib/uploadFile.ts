@@ -1,5 +1,47 @@
 import { generateVideoThumbnail } from '@/lib/videoThumbnail';
 
+/** Convert image_size (Flux) or aspect_ratio (Banana/Video) setting to CSS aspect-ratio */
+export function settingToAspectRatio(settings: Record<string, unknown>): string | undefined {
+  const ar = settings.aspect_ratio as string | undefined;
+  if (ar && ar !== 'auto' && ar.includes(':')) {
+    return ar.replace(':', '/');
+  }
+  const is = settings.image_size as string | undefined;
+  if (is && is !== 'auto') {
+    if (is === 'square' || is === 'square_hd') return '1/1';
+    const m = is.match(/^(landscape|portrait)_(\d+)_(\d+)$/);
+    if (m) {
+      const [, orient, a, b] = m;
+      return orient === 'landscape' ? `${a}/${b}` : `${b}/${a}`;
+    }
+    const res = is.match(/^(\d+)x(\d+)$/);
+    if (res) return `${res[1]}/${res[2]}`;
+  }
+  return undefined;
+}
+
+/** Detect file dimensions and return CSS aspect-ratio string (e.g. "1920/1080") */
+export function detectFileAspectRatio(file: File): Promise<string | undefined> {
+  return new Promise((resolve) => {
+    const url = URL.createObjectURL(file);
+    if (file.type.startsWith('image/')) {
+      const img = new Image();
+      img.onload = () => { URL.revokeObjectURL(url); resolve(`${img.naturalWidth}/${img.naturalHeight}`); };
+      img.onerror = () => { URL.revokeObjectURL(url); resolve(undefined); };
+      img.src = url;
+    } else if (file.type.startsWith('video/')) {
+      const video = document.createElement('video');
+      video.preload = 'metadata';
+      video.onloadedmetadata = () => { URL.revokeObjectURL(url); resolve(`${video.videoWidth}/${video.videoHeight}`); };
+      video.onerror = () => { URL.revokeObjectURL(url); resolve(undefined); };
+      video.src = url;
+    } else {
+      URL.revokeObjectURL(url);
+      resolve(undefined);
+    }
+  });
+}
+
 export interface UploadResult {
   url: string;
   thumbnail: string | null;
