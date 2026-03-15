@@ -114,18 +114,16 @@ export function MediaPreview({
                   className="relative w-full cursor-pointer"
                   onClick={(e) => { e.stopPropagation(); handlePlayClick(item.content); }}
                 >
-                  {item.thumbnail ? (
-                    <img
-                      src={item.thumbnail}
-                      alt=""
-                      className="w-full h-full object-cover"
-                      onLoad={(e) => {
-                        if (isSelected) onImageLoad?.(e.currentTarget.naturalWidth, e.currentTarget.naturalHeight);
-                      }}
-                    />
-                  ) : (
-                    <div className="w-full bg-zinc-900" style={{ aspectRatio: '16/9' }} />
-                  )}
+                  {/* Use a muted paused video to show the first frame as thumbnail */}
+                  <video
+                    src={item.content}
+                    className="w-full"
+                    muted
+                    preload="metadata"
+                    onLoadedMetadata={(e) => {
+                      if (isSelected) onImageLoad?.(e.currentTarget.videoWidth, e.currentTarget.videoHeight);
+                    }}
+                  />
                   {/* Play button overlay */}
                   <div className="absolute inset-0 flex items-center justify-center">
                     <div className="w-12 h-12 rounded-full bg-black/50 hover:bg-black/70 hover:scale-110 flex items-center justify-center backdrop-blur-sm transition-all duration-200">

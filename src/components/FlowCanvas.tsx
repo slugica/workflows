@@ -142,9 +142,12 @@ function BottomBar() {
     return () => document.removeEventListener('mousedown', handler);
   }, []);
 
-  // Keyboard shortcuts for undo/redo
+  // Track space key for pan mode indicator
+  const [isSpaceHeld, setIsSpaceHeld] = useState(false);
+
+  // Keyboard shortcuts for undo/redo + space tracking
   useEffect(() => {
-    const handler = (e: KeyboardEvent) => {
+    const onDown = (e: KeyboardEvent) => {
       if ((e.ctrlKey || e.metaKey) && e.code === 'KeyZ' && !e.shiftKey) {
         e.preventDefault();
         undo();
@@ -156,9 +159,14 @@ function BottomBar() {
       if (e.key === 'Escape' && drawingMode !== 'none') {
         setDrawingMode('none');
       }
+      if (e.code === 'Space') setIsSpaceHeld(true);
     };
-    document.addEventListener('keydown', handler);
-    return () => document.removeEventListener('keydown', handler);
+    const onUp = (e: KeyboardEvent) => {
+      if (e.code === 'Space') setIsSpaceHeld(false);
+    };
+    document.addEventListener('keydown', onDown);
+    document.addEventListener('keyup', onUp);
+    return () => { document.removeEventListener('keydown', onDown); document.removeEventListener('keyup', onUp); };
   }, [undo, redo, drawingMode, setDrawingMode]);
 
   const handleSectionClick = () => {
@@ -202,17 +210,26 @@ function BottomBar() {
       />
       {/* Main tool group */}
       <div className="flex items-center gap-0.5 rounded-2xl px-1 py-1" style={{ background: theme.bottomBarBg, border: `1px solid ${theme.border1}` }}>
-        {/* Select tool */}
+        {/* Select tool / pan indicator */}
         <button
           className={`${btnBase} ${drawingMode === 'none' ? 'text-white' : 'text-zinc-400 hover:text-white'}`}
           style={btnStyle(drawingMode === 'none')}
           {...btnHoverHandlers(drawingMode === 'none')}
           onClick={() => setDrawingMode('none')}
-          title="Select (V)"
+          title="Select (V) · Hold Space to pan"
         >
-          <svg width={16} height={16} viewBox="0 0 24 24" fill="currentColor">
-            <path d="M4 2l14 10.5-5.5 1.5L9 20z" />
-          </svg>
+          {isSpaceHeld ? (
+            <svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+              <path d="M18 11V6a2 2 0 0 0-2-2a2 2 0 0 0-2 2v1" />
+              <path d="M14 10V4a2 2 0 0 0-2-2a2 2 0 0 0-2 2v6" />
+              <path d="M10 10.5V6a2 2 0 0 0-2-2a2 2 0 0 0-2 2v8" />
+              <path d="M18 8a2 2 0 1 1 4 0v6a8 8 0 0 1-8 8h-2c-2.8 0-4.5-.86-5.99-2.34l-3.6-3.6a2 2 0 0 1 2.83-2.82L7 15" />
+            </svg>
+          ) : (
+            <svg width={16} height={16} viewBox="0 0 24 24" fill="currentColor">
+              <path d="M4 2l14 10.5-5.5 1.5L9 20z" />
+            </svg>
+          )}
         </button>
 
         {/* Divider */}

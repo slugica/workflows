@@ -229,6 +229,62 @@ export const useFlowStore = create<FlowState>((set, get) => ({
     });
 
     set({ edges: newEdges, nodes: updatedNodes });
+
+    // Auto-match aspect ratio: when connecting an image to an AI node, set its aspect_ratio/image_size
+    // to match the source image dimensions
+    const targetNode = get().nodes.find(n => n.id === targetNodeId);
+    if (targetNode) {
+      const targetData = targetNode.data as unknown as FlowNodeData;
+      if (targetData.behavior === 'dynamic') {
+        const sourceNode = get().nodes.find(n => n.id === connection.source);
+        if (sourceNode) {
+          const sourceData = sourceNode.data as unknown as FlowNodeData;
+          // Get source image aspect ratio: AI node settings → previewAspectRatio (import)
+          let srcRatio: number | null = null;
+          // 1. Try AI node's own aspect ratio settings
+          const srcAr = settingToAspectRatio(sourceData.settings);
+          if (srcAr) {
+            const [w, h] = srcAr.split('/').map(Number);
+            if (w && h) srcRatio = w / h;
+          }
+          // 2. Fall back to previewAspectRatio (set by file upload detection)
+          if (!srcRatio && sourceData.settings?.previewAspectRatio) {
+            const ar = sourceData.settings.previewAspectRatio as string;
+            const [w, h] = ar.split('/').map(Number);
+            if (w && h) srcRatio = w / h;
+          }
+
+          if (srcRatio) {
+            // Find best matching aspect_ratio option
+            const arOptions: Record<string, number> = {
+              '1:1': 1, '4:3': 4/3, '3:4': 3/4, '3:2': 3/2, '2:3': 2/3,
+              '16:9': 16/9, '9:16': 9/16, '5:4': 5/4, '4:5': 4/5, '21:9': 21/9,
+            };
+            const sizeOptions: Record<string, number> = {
+              'square': 1, 'square_hd': 1,
+              'portrait_4_3': 3/4, 'portrait_16_9': 9/16,
+              'landscape_4_3': 4/3, 'landscape_16_9': 16/9,
+            };
+
+            if (targetData.settings.aspect_ratio !== undefined) {
+              let bestKey = '', bestDiff = Infinity;
+              for (const [key, val] of Object.entries(arOptions)) {
+                const diff = Math.abs(srcRatio - val);
+                if (diff < bestDiff) { bestDiff = diff; bestKey = key; }
+              }
+              if (bestKey) get().updateNodeSetting(targetNodeId, 'aspect_ratio', bestKey);
+            } else if (targetData.settings.image_size !== undefined) {
+              let bestKey = '', bestDiff = Infinity;
+              for (const [key, val] of Object.entries(sizeOptions)) {
+                const diff = Math.abs(srcRatio - val);
+                if (diff < bestDiff) { bestDiff = diff; bestKey = key; }
+              }
+              if (bestKey) get().updateNodeSetting(targetNodeId, 'image_size', bestKey);
+            }
+          }
+        }
+      }
+    }
   },
 
   addNode: (type, templateLabel, position) => {
