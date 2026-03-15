@@ -5,6 +5,7 @@ import { useFlowStore } from '@/store/flowStore';
 import { FlowNodeData } from '@/lib/types';
 import { getModelById, type SettingDef } from '@/lib/modelRegistry';
 import { Sun, Camera } from 'lucide-react';
+import { theme } from '@/lib/theme';
 
 function HexColorInput({ value, onChange }: { value: string; onChange: (val: string) => void }) {
   const [draft, setDraft] = useState(value);
@@ -14,7 +15,8 @@ function HexColorInput({ value, onChange }: { value: string; onChange: (val: str
     <input
       type="text"
       value={displayed}
-      className="flex-1 bg-[#171717] text-zinc-300 text-xs rounded-lg px-3 py-2 border border-[#212121] focus:outline-none uppercase"
+      className="flex-1 text-zinc-300 text-xs rounded-lg px-3 py-2 border focus:outline-none uppercase"
+      style={{ backgroundColor: theme.surface1, borderColor: theme.border1 }}
       onFocus={() => { setDraft(value); setFocused(true); }}
       onBlur={() => {
         setFocused(false);
@@ -44,7 +46,8 @@ function SettingControl({
     case 'select':
       return (
         <select
-          className="w-full bg-[#171717] text-zinc-200 text-xs rounded-lg px-3 py-2 border border-[#212121] focus:outline-none"
+          className="w-full text-zinc-200 text-xs rounded-lg px-3 py-2 border focus:outline-none"
+          style={{ backgroundColor: theme.surface1, borderColor: theme.border1 }}
           value={String(value ?? def.default ?? '')}
           onChange={(e) => onChange(e.target.value)}
         >
@@ -81,7 +84,8 @@ function SettingControl({
           min={def.min}
           max={def.max}
           step={def.step}
-          className="w-full bg-[#171717] text-zinc-200 text-xs rounded-lg px-3 py-2 border border-[#212121] focus:outline-none"
+          className="w-full text-zinc-200 text-xs rounded-lg px-3 py-2 border focus:outline-none"
+          style={{ backgroundColor: theme.surface1, borderColor: theme.border1 }}
           value={value != null ? String(value) : ''}
           placeholder={def.description || ''}
           onChange={(e) => {
@@ -110,7 +114,8 @@ function SettingControl({
     case 'text':
       return (
         <textarea
-          className="w-full bg-[#171717] text-zinc-200 text-xs rounded-lg px-3 py-2 border border-[#212121] focus:outline-none resize-none"
+          className="w-full text-zinc-200 text-xs rounded-lg px-3 py-2 border focus:outline-none resize-none"
+            style={{ backgroundColor: theme.surface1, borderColor: theme.border1 }}
           rows={2}
           value={String(value ?? def.default ?? '')}
           placeholder={def.description || ''}
@@ -444,8 +449,9 @@ function RelightProperties({ nodeId, settings }: { nodeId: string; settings: Rec
                 className={`text-[10px] font-medium px-1 py-1.5 rounded-lg border transition-colors ${
                   isActive
                     ? 'bg-white/10 border-white/20 text-white'
-                    : 'bg-[#171717] border-[#212121] text-zinc-400 hover:bg-[#212121] hover:text-zinc-300'
+                    : 'text-zinc-400 hover:text-zinc-300'
                 }`}
+                style={isActive ? undefined : { backgroundColor: theme.surface1, borderColor: theme.border1 }}
                 onClick={() => {
                   updateNodeSetting(nodeId, 'azimuth', preset.azimuth);
                   updateNodeSetting(nodeId, 'elevation', preset.elevation);
@@ -479,7 +485,7 @@ function RelightProperties({ nodeId, settings }: { nodeId: string; settings: Rec
       <div>
         <label className="text-[11px] text-zinc-500 block mb-1">Light Color</label>
         <div className="flex items-center gap-2">
-          <div className="relative w-8 h-8 rounded-lg overflow-hidden border border-[#212121] flex-shrink-0">
+          <div className="relative w-8 h-8 rounded-lg overflow-hidden border flex-shrink-0" style={{ borderColor: theme.border1 }}>
             <input
               type="color"
               value={colorHex}
@@ -499,7 +505,8 @@ function RelightProperties({ nodeId, settings }: { nodeId: string; settings: Rec
       <div>
         <label className="text-[11px] text-zinc-500 block mb-1">Aspect Ratio</label>
         <select
-          className="w-full bg-[#171717] text-zinc-200 text-xs rounded-lg px-3 py-2 border border-[#212121] focus:outline-none"
+          className="w-full text-zinc-200 text-xs rounded-lg px-3 py-2 border focus:outline-none"
+          style={{ backgroundColor: theme.surface1, borderColor: theme.border1 }}
           value={aspectRatio}
           onChange={(e) => addAspectRatioPreview(nodeId, e.target.value)}
         >
@@ -513,7 +520,8 @@ function RelightProperties({ nodeId, settings }: { nodeId: string; settings: Rec
       <div>
         <label className="text-[11px] text-zinc-500 block mb-1">Resolution</label>
         <select
-          className="w-full bg-[#171717] text-zinc-200 text-xs rounded-lg px-3 py-2 border border-[#212121] focus:outline-none"
+          className="w-full text-zinc-200 text-xs rounded-lg px-3 py-2 border focus:outline-none"
+          style={{ backgroundColor: theme.surface1, borderColor: theme.border1 }}
           value={resolution}
           onChange={(e) => updateNodeSetting(nodeId, 'resolution', e.target.value)}
         >
@@ -737,8 +745,9 @@ function CameraAnglesProperties({ nodeId, settings }: { nodeId: string; settings
                 className={`text-[10px] font-medium px-1 py-1.5 rounded-lg border transition-colors ${
                   isActive
                     ? 'bg-white/10 border-white/20 text-white'
-                    : 'bg-[#171717] border-[#212121] text-zinc-400 hover:bg-[#212121] hover:text-zinc-300'
+                    : 'text-zinc-400 hover:text-zinc-300'
                 }`}
+                style={isActive ? undefined : { backgroundColor: theme.surface1, borderColor: theme.border1 }}
                 onClick={() => {
                   updateNodeSetting(nodeId, 'rotateRightLeft', preset.azimuth);
                   updateNodeSetting(nodeId, 'verticalAngle', preset.elevation);
@@ -795,7 +804,8 @@ function CameraAnglesProperties({ nodeId, settings }: { nodeId: string; settings
       <div>
         <label className="text-[11px] text-zinc-500 block mb-1">Aspect Ratio</label>
         <select
-          className="w-full bg-[#171717] text-zinc-200 text-xs rounded-lg px-3 py-2 border border-[#212121] focus:outline-none"
+          className="w-full text-zinc-200 text-xs rounded-lg px-3 py-2 border focus:outline-none"
+          style={{ backgroundColor: theme.surface1, borderColor: theme.border1 }}
           value={aspectRatio}
           onChange={(e) => addAspectRatioPreview(nodeId, e.target.value)}
         >
@@ -834,7 +844,8 @@ function CameraAnglesProperties({ nodeId, settings }: { nodeId: string; settings
         <label className="text-[11px] text-zinc-500 block mb-1">Seed</label>
         <input
           type="number"
-          className="w-full bg-[#171717] text-zinc-200 text-xs rounded-lg px-3 py-2 border border-[#212121] focus:outline-none"
+          className="w-full text-zinc-200 text-xs rounded-lg px-3 py-2 border focus:outline-none"
+          style={{ backgroundColor: theme.surface1, borderColor: theme.border1 }}
           placeholder="Enter Seed"
           value={seed ?? ''}
           onChange={(e) => {
@@ -859,7 +870,8 @@ function CameraAnglesProperties({ nodeId, settings }: { nodeId: string; settings
       <div>
         <label className="text-[11px] text-zinc-500 block mb-1">Resolution</label>
         <select
-          className="w-full bg-[#171717] text-zinc-200 text-xs rounded-lg px-3 py-2 border border-[#212121] focus:outline-none"
+          className="w-full text-zinc-200 text-xs rounded-lg px-3 py-2 border focus:outline-none"
+          style={{ backgroundColor: theme.surface1, borderColor: theme.border1 }}
           value={resolution}
           onChange={(e) => updateNodeSetting(nodeId, 'resolution', e.target.value)}
         >
@@ -883,7 +895,7 @@ export function PropertiesPanel() {
 
   if (!selectedNode) {
     return (
-      <div className="w-[280px] bg-[#0F0F0F] border-l border-[#212121] flex items-center justify-center">
+      <div className="w-[280px] flex items-center justify-center" style={{ backgroundColor: theme.panelBg, borderLeft: `1px solid ${theme.panelBorder}` }}>
         <p className="text-zinc-600 text-xs">Select a node to see properties</p>
       </div>
     );
@@ -895,9 +907,9 @@ export function PropertiesPanel() {
   const modelDef = modelId ? getModelById(modelId) : null;
 
   return (
-    <div className="w-[280px] bg-[#0F0F0F] border-l border-[#212121] flex flex-col h-full">
+    <div className="w-[280px] flex flex-col h-full" style={{ backgroundColor: theme.panelBg, borderLeft: `1px solid ${theme.panelBorder}` }}>
       {/* Header */}
-      <div className="p-3 border-b border-[#212121] flex items-center justify-between">
+      <div className="p-3 flex items-center justify-between" style={{ borderBottom: `1px solid ${theme.border1}` }}>
         <h2 className="text-sm font-semibold text-zinc-200">Properties</h2>
         <button
           onClick={() => deleteNode(selectedNode.id)}
@@ -913,7 +925,8 @@ export function PropertiesPanel() {
           <label className="text-[11px] text-zinc-500 block mb-1">Name</label>
           <input
             type="text"
-            className="w-full bg-[#171717] text-zinc-200 text-xs rounded-lg px-3 py-2 border border-[#212121] focus:border-[#333] focus:outline-none"
+            className="w-full text-zinc-200 text-xs rounded-lg px-3 py-2 border focus:outline-none"
+            style={{ backgroundColor: theme.surface1, borderColor: theme.border1 }}
             value={nodeData.name || ''}
             onChange={(e) => updateNodeData(selectedNode.id, { name: e.target.value })}
           />
@@ -922,7 +935,7 @@ export function PropertiesPanel() {
         {/* Type & Model */}
         <div>
           <label className="text-[11px] text-zinc-500 block mb-1">Type</label>
-          <span className="text-xs px-2 py-1 rounded bg-[#212121] text-zinc-300">
+          <span className="text-xs px-2 py-1 rounded text-zinc-300" style={{ backgroundColor: theme.surface2 }}>
             {selectedNode.type} ({nodeData.behavior})
           </span>
           {modelDef && (
@@ -976,7 +989,8 @@ export function PropertiesPanel() {
                         {key === 'systemPrompt' ? 'System Prompt' : 'Prompt'}
                       </label>
                       <textarea
-                        className="w-full bg-[#171717] text-zinc-200 text-xs rounded-lg px-3 py-2 border border-[#212121] focus:outline-none resize-none"
+                        className="w-full text-zinc-200 text-xs rounded-lg px-3 py-2 border focus:outline-none resize-none"
+            style={{ backgroundColor: theme.surface1, borderColor: theme.border1 }}
                         rows={4}
                         value={String(value || '')}
                         onChange={(e) => updateNodeSetting(selectedNode.id, key, e.target.value)}
@@ -991,7 +1005,8 @@ export function PropertiesPanel() {
                       <label className="text-[10px] text-zinc-600 block mb-1">{key}</label>
                       <input
                         type="number"
-                        className="w-full bg-[#171717] text-zinc-200 text-xs rounded-lg px-3 py-2 border border-[#212121] focus:outline-none"
+                        className="w-full text-zinc-200 text-xs rounded-lg px-3 py-2 border focus:outline-none"
+          style={{ backgroundColor: theme.surface1, borderColor: theme.border1 }}
                         value={value}
                         onChange={(e) => updateNodeSetting(selectedNode.id, key, Number(e.target.value))}
                       />
@@ -1005,7 +1020,8 @@ export function PropertiesPanel() {
                       <label className="text-[10px] text-zinc-600 block mb-1">{key}</label>
                       <input
                         type="text"
-                        className="w-full bg-[#171717] text-zinc-200 text-xs rounded-lg px-3 py-2 border border-[#212121] focus:outline-none"
+                        className="w-full text-zinc-200 text-xs rounded-lg px-3 py-2 border focus:outline-none"
+          style={{ backgroundColor: theme.surface1, borderColor: theme.border1 }}
                         value={value}
                         onChange={(e) => updateNodeSetting(selectedNode.id, key, e.target.value)}
                       />
@@ -1044,7 +1060,7 @@ export function PropertiesPanel() {
 
         {/* Run button for dynamic nodes */}
         {nodeData.behavior === 'dynamic' && (
-          <div className="pt-2 border-t border-[#212121]">
+          <div className="pt-2 border-t" style={{ borderColor: theme.border1 }}>
             <button
               className="w-full text-xs py-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white transition-colors font-medium"
               onClick={() => {

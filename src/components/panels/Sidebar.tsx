@@ -5,6 +5,7 @@ import { useReactFlow } from '@xyflow/react';
 import { NODE_TEMPLATES, FlowNodeType } from '@/lib/types';
 import { useFlowStore } from '@/store/flowStore';
 import { Upload, Type, ImageIcon, Video, AudioLines, Bot, Zap, Pencil, Search, Wrench, Crop, Download, ScanLine, Droplets, Scaling, SlidersHorizontal, Settings2, Grid2x2, IterationCcw, Sun, Camera, Film, Scissors, AudioWaveform, Combine, Eye } from 'lucide-react';
+import { theme } from '@/lib/theme';
 
 // ── Quick-add buttons (top section) ──────────────────────────────────────────
 
@@ -109,7 +110,7 @@ export function Sidebar() {
       (t) => t.label.toLowerCase().includes(q) || t.category.toLowerCase().includes(q)
     );
     return (
-      <div className="w-[280px] bg-[#0F0F0F] border-r border-[#212121] flex flex-col h-full">
+      <div className="w-[280px] flex flex-col h-full" style={{ backgroundColor: theme.panelBg, borderRight: `1px solid ${theme.panelBorder}` }}>
         <input ref={fileInputRef} type="file" className="hidden" accept="image/*,video/*" onChange={handleFileChange} />
         <Header searchQuery={searchQuery} setSearchQuery={setSearchQuery} />
         <div className="flex-1 overflow-y-auto p-2 space-y-0.5">
@@ -132,7 +133,7 @@ export function Sidebar() {
   }
 
   return (
-    <div className="w-[280px] bg-[#0F0F0F] border-r border-[#212121] flex flex-col h-full">
+    <div className="w-[280px] flex flex-col h-full" style={{ backgroundColor: theme.panelBg, borderRight: `1px solid ${theme.panelBorder}` }}>
       <input ref={fileInputRef} type="file" className="hidden" accept="image/*,video/*" onChange={handleFileChange} />
       <Header searchQuery={searchQuery} setSearchQuery={setSearchQuery} />
 
@@ -147,7 +148,8 @@ export function Sidebar() {
                 className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-[#212121]/70 transition-colors text-left group"
                 onClick={() => handleAdd(item.type, item.templateLabel)}
               >
-                <span className="w-8 h-8 rounded-lg bg-[#212121] flex items-center justify-center text-sm group-hover:bg-[#2a2a2a] transition-colors">
+                <span className="w-8 h-8 rounded-lg flex items-center justify-center text-sm transition-colors"
+                    style={{ backgroundColor: theme.surface2 }}>
                   {item.icon}
                 </span>
                 <span className="text-sm text-zinc-300 flex-1">{item.label}</span>
@@ -170,7 +172,8 @@ export function Sidebar() {
                   className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-[#212121]/70 transition-colors text-left group ${isOpen ? 'bg-[#212121]/50' : ''}`}
                   onClick={() => toggleSub('Essentials')}
                 >
-                  <span className="w-8 h-8 rounded-lg bg-[#212121] flex items-center justify-center text-sm group-hover:bg-[#2a2a2a] transition-colors">
+                  <span className="w-8 h-8 rounded-lg flex items-center justify-center text-sm transition-colors"
+                    style={{ backgroundColor: theme.surface2 }}>
                     <Zap size={14} />
                   </span>
                   <span className="text-sm text-zinc-300 flex-1">Essentials</span>
@@ -231,7 +234,8 @@ export function Sidebar() {
                       }`}
                       onClick={() => toggleSub(sub.label)}
                     >
-                      <span className="w-8 h-8 rounded-lg bg-[#212121] flex items-center justify-center text-sm group-hover:bg-[#2a2a2a] transition-colors">
+                      <span className="w-8 h-8 rounded-lg flex items-center justify-center text-sm transition-colors"
+                    style={{ backgroundColor: theme.surface2 }}>
                         {sub.icon}
                       </span>
                       <span className="text-sm text-zinc-300 flex-1">{sub.label}</span>
@@ -284,7 +288,7 @@ function Header({
   setSearchQuery: (q: string) => void;
 }) {
   return (
-    <div className="p-3 border-b border-[#212121]">
+    <div className="p-3 border-b" style={{ borderColor: theme.border1 }}>
       <h2 className="text-sm font-semibold text-zinc-200 mb-2">Nodes</h2>
       <div className="relative">
         <svg
@@ -299,7 +303,8 @@ function Header({
         <input
           type="text"
           placeholder="Search nodes or models"
-          className="w-full bg-[#171717] text-zinc-300 text-xs rounded-lg pl-8 pr-3 py-2 border border-[#212121] focus:border-[#333] focus:outline-none"
+          className="w-full text-zinc-300 text-xs rounded-lg pl-8 pr-3 py-2 border focus:outline-none"
+          style={{ backgroundColor: theme.surface1, borderColor: theme.border1 }}
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
         />
@@ -328,7 +333,7 @@ function ModelItem({
       onDragStart={onDragStart}
       onClick={onAdd}
     >
-      <span className="w-6 h-6 rounded-md bg-[#212121] flex items-center justify-center text-[11px] group-hover:bg-[#2a2a2a] transition-colors">
+      <span className="w-6 h-6 rounded-md flex items-center justify-center text-[11px] transition-colors" style={{ backgroundColor: theme.surface2 }}>
         {type === 'image' ? <ImageIcon size={11} /> : type === 'video' ? <Video size={11} /> : type === 'audio' ? <AudioLines size={11} /> : type === 'prompt' ? <Type size={11} /> : type === 'import' ? <Upload size={11} /> : type === 'crop' ? <Crop size={11} /> : type === 'export' ? <Download size={11} /> : type === 'preview' ? <ScanLine size={11} /> : type === 'blur' ? <Droplets size={11} /> : type === 'resize' ? <Scaling size={11} /> : type === 'filters' ? <SlidersHorizontal size={11} /> : type === 'levels' ? <Settings2 size={11} /> : type === 'splitImage' ? <Grid2x2 size={11} /> : type === 'imageIterator' ? <IterationCcw size={11} /> : type === 'aiResize' ? <Scaling size={11} /> : type === 'relight' ? <Sun size={11} /> : type === 'cameraAngles' ? <Camera size={11} /> : type === 'extractFrame' ? <Film size={11} /> : type === 'trimVideo' ? <Scissors size={11} /> : type === 'combineAudioVideo' ? <AudioWaveform size={11} /> : type === 'combineVideo' ? <Combine size={11} /> : type === 'videoIterator' ? <IterationCcw size={11} /> : <Bot size={11} />}
       </span>
       <div className="flex-1 min-w-0">

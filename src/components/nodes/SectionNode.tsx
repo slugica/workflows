@@ -13,18 +13,9 @@ import {
   ChevronDown,
   ChevronUp,
 } from 'lucide-react';
+import { theme } from '@/lib/theme';
 
-const SECTION_COLORS = [
-  '#555555', // gray (default)
-  '#3b82f6', // blue
-  '#22c55e', // green
-  '#ef4444', // red
-  '#a855f7', // purple
-  '#84cc16', // lime
-  '#ec4899', // pink
-  '#f97316', // orange
-  '#06b6d4', // cyan
-];
+const SECTION_COLORS = theme.sectionColors;
 
 export const SectionNode = memo(function SectionNode(props: NodeProps) {
   const { id, selected } = props;
@@ -120,7 +111,8 @@ export const SectionNode = memo(function SectionNode(props: NodeProps) {
           style={{ top: 0, transform: `translateY(calc(-100% - 8px)) scale(${1 / zoom})`, transformOrigin: 'bottom left' }}
         >
           <input
-            className="text-[12px] text-zinc-400 bg-[#171717] border border-[#2a2a2a] rounded-md px-2 py-0.5 outline-none max-w-[160px] nodrag"
+            className="text-[12px] text-zinc-400 rounded-md px-2 py-0.5 outline-none max-w-[160px] nodrag"
+            style={{ background: theme.surface1, border: `1px solid ${theme.surfaceHover}` }}
             defaultValue={label}
             onChange={(e) => {
               useFlowStore.getState().updateNodeData(id, { label: e.target.value } as never);
@@ -130,10 +122,10 @@ export const SectionNode = memo(function SectionNode(props: NodeProps) {
 
         {/* Toolbar — centered above section */}
         <div
-          className={`absolute left-1/2 bottom-full mb-8 flex items-center gap-1 bg-[#1a1a1a] border border-[#333] rounded-full px-2 py-1.5 nodrag transition-opacity duration-200 ${
+          className={`absolute left-1/2 bottom-full mb-8 flex items-center gap-1 rounded-full px-2 py-1.5 nodrag transition-opacity duration-200 ${
             selected ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'
           }`}
-          style={{ transform: `translateX(-50%) scale(${1 / zoom})`, transformOrigin: 'bottom center' }}
+          style={{ background: theme.toolbarBg, border: `1px solid ${theme.toolbarBorder}`, transform: `translateX(-50%) scale(${1 / zoom})`, transformOrigin: 'bottom center' }}
           onClick={(e) => e.stopPropagation()}
         >
           {/* Color picker */}
@@ -150,7 +142,7 @@ export const SectionNode = memo(function SectionNode(props: NodeProps) {
               {colorOpen ? <ChevronUp size={10} className="ml-0.5" /> : <ChevronDown size={10} className="ml-0.5" />}
             </button>
             {colorOpen && (
-              <div className="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 bg-[#1a1a1a] border border-[#333] rounded-xl py-2 px-2 shadow-xl flex items-center gap-1.5">
+              <div className="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 rounded-xl py-2 px-2 shadow-xl flex items-center gap-1.5" style={{ background: theme.toolbarBg, border: `1px solid ${theme.toolbarBorder}` }}>
                 {SECTION_COLORS.map((c) => (
                   <button
                     key={c}
@@ -186,7 +178,7 @@ export const SectionNode = memo(function SectionNode(props: NodeProps) {
           </button>
 
           {/* Run Section */}
-          <div className="w-px h-5 bg-[#333] mx-0.5" />
+          <div className="w-px h-5 mx-0.5" style={{ background: theme.border3 }} />
           <button
             className={`flex items-center gap-1.5 px-3 h-8 rounded-full transition-colors text-[13px] nodrag ${
               running

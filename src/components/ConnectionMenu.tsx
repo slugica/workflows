@@ -3,6 +3,12 @@
 import { useState, useRef, useEffect, useMemo } from 'react';
 import { NODE_TEMPLATES, type FlowNodeType, type HandleDataType } from '@/lib/types';
 import { Search, ChevronRight } from 'lucide-react';
+import { theme } from '@/lib/theme';
+
+const hoverBg = (color: string) => ({
+  onMouseEnter: (e: React.MouseEvent<HTMLButtonElement>) => { e.currentTarget.style.background = color; },
+  onMouseLeave: (e: React.MouseEvent<HTMLButtonElement>) => { e.currentTarget.style.background = ''; },
+});
 
 interface ConnectionMenuProps {
   position: { x: number; y: number };
@@ -144,12 +150,12 @@ export function ConnectionMenu({ position, sourceHandleType, onSelect, onClose }
   return (
     <div
       ref={menuRef}
-      className="fixed z-[9999] bg-[#171717] border border-[#333] rounded-xl shadow-2xl w-[280px] flex flex-col"
-      style={{ left: position.x, top: position.y, maxHeight: `${window.innerHeight - position.y - 16}px` }}
+      className="fixed z-[9999] rounded-xl shadow-2xl w-[280px] flex flex-col"
+      style={{ left: position.x, top: position.y, maxHeight: `${window.innerHeight - position.y - 16}px`, background: theme.surface1, border: `1px solid ${theme.border3}` }}
     >
       {/* Search */}
-      <div className="p-2 border-b border-[#252525]">
-        <div className="flex items-center gap-2 bg-[#212121] rounded-lg px-3 py-2">
+      <div className="p-2" style={{ borderBottom: `1px solid ${theme.surfaceHover}` }}>
+        <div className="flex items-center gap-2 rounded-lg px-3 py-2" style={{ background: theme.surface2 }}>
           <Search size={14} className="text-zinc-500 shrink-0" />
           <input
             ref={inputRef}
@@ -168,7 +174,8 @@ export function ConnectionMenu({ position, sourceHandleType, onSelect, onClose }
             searchResults.map((t) => (
               <button
                 key={`${t.type}-${t.label}`}
-                className="w-full flex items-center gap-2 px-3 py-2 hover:bg-[#212121] text-left transition-colors"
+                className="w-full flex items-center gap-2 px-3 py-2 text-left transition-colors"
+                {...hoverBg(theme.surface2)}
                 onClick={() => handleSelect(t.type, t.label)}
               >
                 <span className="text-[13px] text-zinc-300 flex-1 truncate">{t.label}</span>
@@ -189,9 +196,10 @@ export function ConnectionMenu({ position, sourceHandleType, onSelect, onClose }
                   .map((r) => (
                     <button
                       key={`${r.type}-${r.label}`}
-                      className="w-full flex items-center gap-2 px-3 py-2 hover:bg-[#212121] text-left transition-colors"
+                      className="w-full flex items-center gap-2 px-3 py-2 text-left transition-colors"
                       onClick={() => handleSelect(r.type, r.label)}
-                      onMouseEnter={() => setHoveredSub(null)}
+                      onMouseEnter={(e) => { e.currentTarget.style.background = theme.surface2; setHoveredSub(null); }}
+                      onMouseLeave={(e) => { e.currentTarget.style.background = ''; }}
                     >
                       <span className="text-[13px] text-zinc-300">{r.label}</span>
                     </button>
@@ -237,9 +245,10 @@ export function ConnectionMenu({ position, sourceHandleType, onSelect, onClose }
                       return (
                         <button
                           key={sub.label}
-                          className="w-full flex items-center gap-2 px-3 py-2 hover:bg-[#212121] text-left transition-colors"
+                          className="w-full flex items-center gap-2 px-3 py-2 text-left transition-colors"
                           onClick={() => handleSelect(templates[0].type, templates[0].label)}
-                          onMouseEnter={() => setHoveredSub(null)}
+                          onMouseEnter={(e) => { e.currentTarget.style.background = theme.surface2; setHoveredSub(null); }}
+                          onMouseLeave={(e) => { e.currentTarget.style.background = ''; }}
                         >
                           <span className="text-[13px] text-zinc-300 flex-1">{sub.label}</span>
                         </button>
@@ -308,14 +317,15 @@ function SubMenuItem({
       onMouseEnter={onHover}
       onMouseLeave={onLeave}
     >
-      <button className="w-full flex items-center gap-2 px-3 py-2 hover:bg-[#212121] text-left transition-colors">
+      <button className="w-full flex items-center gap-2 px-3 py-2 text-left transition-colors"
+                {...hoverBg(theme.surface2)}>
         <span className="text-[13px] text-zinc-300 flex-1">{label}</span>
         <ChevronRight size={14} className="text-zinc-500" />
       </button>
       {isHovered && flyoutPos && (
         <div
-          className="fixed z-[10000] bg-[#1a1a1a] border border-[#333] rounded-xl shadow-2xl min-w-[220px] max-h-[360px] overflow-y-auto"
-          style={{ top: flyoutPos.top - 8, left: flyoutPos.left, padding: '8px 0' }}
+          className="fixed z-[10000] rounded-xl shadow-2xl min-w-[220px] max-h-[360px] overflow-y-auto"
+          style={{ top: flyoutPos.top - 8, left: flyoutPos.left, padding: '8px 0', background: theme.surface3, border: `1px solid ${theme.border3}` }}
           onMouseEnter={onHover}
           onMouseLeave={onLeave}
         >
@@ -323,7 +333,8 @@ function SubMenuItem({
           {templates.map((t) => (
             <button
               key={`${t.type}-${t.label}`}
-              className="w-full flex items-center gap-2 px-3 py-2 hover:bg-[#252525] text-left transition-colors"
+              className="w-full flex items-center gap-2 px-3 py-2 text-left transition-colors"
+              {...hoverBg(theme.surfaceHover)}
               onClick={() => onSelect(t.type, t.label)}
             >
               <span className="text-[13px] text-zinc-300">{t.label}</span>

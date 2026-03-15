@@ -45,6 +45,7 @@ import { ExtractFrameNode } from '@/components/nodes/ExtractFrameNode';
 import { FlowNodeType, HANDLE_COLORS, resolveFileHandleColor, detectMediaType, type FlowNodeData, type HandleDataType } from '@/lib/types';
 import { ConnectionMenu } from '@/components/ConnectionMenu';
 import { MultiSelectionToolbar } from '@/components/MultiSelectionToolbar';
+import { ToastContainer } from '@/components/ToastContainer';
 import { theme } from '@/lib/theme';
 
 import { BaseEdge, type EdgeProps } from '@xyflow/react';
@@ -777,6 +778,7 @@ export function FlowCanvas() {
 
   return (
     <div className="flex-1 h-full relative" ref={reactFlowWrapper}>
+      <ToastContainer />
       <MultiSelectionToolbar />
       <SectionDrawingOverlay />
       {connectionMenu && (

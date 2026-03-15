@@ -6,6 +6,7 @@ import { FlowNodeData, HANDLE_COLORS, resolveFileHandleColor } from '@/lib/types
 import { useFlowStore } from '@/store/flowStore';
 import { IterationCcw, Plus } from 'lucide-react';
 import { NodeQuickActions } from './NodeQuickActions';
+import { theme } from '@/lib/theme';
 
 const HANDLE_SIZE = 18;
 const HEADER_OFFSET = 68;
@@ -227,12 +228,16 @@ export function VideoIteratorNode(props: NodeProps) {
       {/* Card */}
       <div
         className={`
-          bg-[#171717] rounded-[24px] border-2 border-[#212121] relative flex flex-col items-start
+          rounded-[24px] border-2 relative flex flex-col items-start
           p-4 pt-3 w-full
           drop-shadow-sm group-hover:drop-shadow-md
           ${selected ? 'border-white/30 show-labels' : ''}
         `}
-        style={minCardHeight ? { minHeight: minCardHeight } : undefined}
+        style={{
+          backgroundColor: theme.surface1,
+          borderColor: selected ? undefined : theme.border1,
+          ...(minCardHeight ? { minHeight: minCardHeight } : {}),
+        }}
       >
         {/* Header */}
         <header className="mb-2 flex h-7 items-center justify-between gap-2 self-stretch">
@@ -259,7 +264,7 @@ export function VideoIteratorNode(props: NodeProps) {
                   id={handle.id}
                   className="!relative !transform-none !w-[18px] !h-[18px] !rounded-full !border-2 !left-0 !top-0 !flex !items-center !justify-center"
                   style={{
-                    backgroundColor: isConnected ? color : '#171717',
+                    backgroundColor: isConnected ? color : theme.surface1,
                     borderColor: color,
                   }}
                 >
@@ -289,7 +294,7 @@ export function VideoIteratorNode(props: NodeProps) {
                   id={handle.id}
                   className="!relative !transform-none !w-[18px] !h-[18px] !rounded-full !border-2 !left-0 !top-0 !flex !items-center !justify-center"
                   style={{
-                    backgroundColor: isConnected ? color : '#171717',
+                    backgroundColor: isConnected ? color : theme.surface1,
                     borderColor: color,
                   }}
                 >
@@ -314,9 +319,10 @@ export function VideoIteratorNode(props: NodeProps) {
                 return (
                   <div
                     key={vid.key}
-                    className={`relative bg-[#212121] rounded-xl overflow-hidden cursor-pointer transition-all nodrag ${
+                    className={`relative rounded-xl overflow-hidden cursor-pointer transition-all nodrag ${
                       isSelected ? 'ring-2 ring-white/60' : 'ring-1 ring-transparent hover:ring-white/20'
                     }`}
+                    style={{ backgroundColor: theme.surface2 }}
                     onClick={(e) => { e.stopPropagation(); selectVideo(vid.key); }}
                   >
                     {vid.uploading ? (
@@ -336,7 +342,10 @@ export function VideoIteratorNode(props: NodeProps) {
             </div>
           ) : (
             <div
-              className="bg-[#212121] rounded-2xl p-8 text-center cursor-pointer hover:bg-[#292929] transition-colors nodrag aspect-video flex items-center justify-center"
+              className="rounded-2xl p-8 text-center cursor-pointer transition-colors nodrag aspect-video flex items-center justify-center"
+              style={{ backgroundColor: theme.surface2 }}
+              onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = theme.surfaceHover; }}
+              onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = theme.surface2; }}
               onClick={(e) => { e.stopPropagation(); fileInputRef.current?.click(); }}
               onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); }}
               onDrop={(e) => {

@@ -1,13 +1,13 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { Handle, Position, useEdges, useNodes, type NodeProps } from '@xyflow/react';
 import { FlowNodeData, HANDLE_COLORS, resolveFileHandleColor } from '@/lib/types';
 import { resolveInputImageUrl } from '@/lib/resolveInput';
 import { ensureRemoteUrl } from '@/lib/executeNode';
 import { useFlowStore } from '@/store/flowStore';
 import { Scaling, Play, Loader } from 'lucide-react';
-import { ResultNavOverlay } from '@/components/nodes/ResultNavOverlay';
+import { MediaPreview, type MediaItem } from '@/components/nodes/MediaPreview';
 import { NodeQuickActions } from './NodeQuickActions';
 import { NodeSelect, NodeLabel } from './controls';
 import { theme } from '@/lib/theme';
@@ -107,7 +107,7 @@ export function AiResizeNode(props: NodeProps) {
   const handleRun = async () => {
     if (!inputImageUrl || !imgNatural) return;
 
-    useFlowStore.getState().updateNodeData(id, { status: 'running', errorMessage: '' });
+    useFlowStore.getState().updateNodeData(id, { status: 'running' });
 
     const prompt = buildPrompt(aspectRatio, imgNatural.w, imgNatural.h);
 
@@ -151,10 +151,8 @@ export function AiResizeNode(props: NodeProps) {
         selectedResultIndex: allResults.length - 1,
       });
     } catch (err) {
-      useFlowStore.getState().updateNodeData(id, {
-        status: 'error',
-        errorMessage: err instanceof Error ? err.message : String(err),
-      });
+      useFlowStore.getState().updateNodeData(id, { status: 'idle' });
+      useFlowStore.getState().addToast(`AI Resize: ${err instanceof Error ? err.message : String(err)}`);
     }
   };
 
@@ -166,6 +164,34 @@ export function AiResizeNode(props: NodeProps) {
   const resultMeta = resultEntry ? Object.values(resultEntry)[0] : null;
   const isPreview = resultMeta?.format === 'preview';
   const resultUrl = resultMeta && !isPreview ? resultMeta.content : null;
+
+  const previewItems = useMemo((): MediaItem[] => {
+    if (!data.results?.length) return [];
+    return data.results.map(r => {
+      const entry = Object.values(r)[0];
+      return {
+        content: entry?.content || '',
+        format: (entry?.format === 'video' ? 'video' : entry?.format === 'audio' ? 'audio' : 'image') as MediaItem['format'],
+        loading: !!entry?.loading,
+      };
+    });
+  }, [data.results]);
+
+  const handlePreviewNavigate = useCallback((idx: number) => {
+    useFlowStore.getState().updateNodeData(id, { selectedResultIndex: idx });
+  }, [id]);
+
+  const handlePreviewDelete = useCallback((idx: number) => {
+    const store = useFlowStore.getState();
+    const results = data.results || [];
+    const newResults = results.filter((_, i) => i !== idx);
+    const newIdx = Math.max(0, Math.min(idx, newResults.length - 1));
+    store.updateNodeData(id, {
+      results: newResults,
+      selectedResultIndex: newIdx,
+      ...(newResults.length === 0 ? { status: 'idle' as const } : {}),
+    });
+  }, [id, data.results]);
 
   return (
     <NodeQuickActions nodeId={id} selected={selected} data={data}
@@ -284,73 +310,23 @@ export function AiResizeNode(props: NodeProps) {
         {/* Content */}
         <div className="self-stretch">
           {/* Result view */}
-          {isPreview && inputImageUrl ? (
-            <div className="relative group/preview">
-              {previewLayout ? (
-                <div
-                  className="relative rounded-2xl overflow-hidden mx-auto"
-                  style={{ width: previewLayout.containerW, height: previewLayout.containerH }}
-                >
-                  {isRunning ? (
-                    <div className="shimmer w-full h-full" />
-                  ) : (
-                    <div className="checkerboard w-full h-full relative">
-                      <img
-                        src={inputImageUrl}
-                        alt="Preview"
-                        className="absolute object-cover"
-                        style={{
-                          left: previewLayout.imgLeft,
-                          top: previewLayout.imgTop,
-                          width: previewLayout.imgW,
-                          height: previewLayout.imgH,
-                        }}
-                      />
-                    </div>
-                  )}
-                </div>
-              ) : (
-                <div className={`rounded-2xl ${isRunning ? 'shimmer' : ''}`} style={{ ...(!isRunning ? { backgroundColor: theme.previewBg } : {}), aspectRatio: aspectRatio.replace(':', '/') }} />
-              )}
-              <ResultNavOverlay nodeId={id} results={data.results} selectedResultIndex={data.selectedResultIndex || 0} />
-            </div>
-          ) : resultUrl ? (
-            <div className="relative group/preview rounded-2xl overflow-hidden" style={{ backgroundColor: theme.previewBg }}>
-              <img src={resultUrl} alt="AI Resize result" className="w-full" />
-              <ResultNavOverlay nodeId={id} results={data.results} selectedResultIndex={data.selectedResultIndex || 0} />
-            </div>
-          ) : isRunning ? (
-            <div
-              className="shimmer rounded-2xl"
-              style={{ width: '100%', aspectRatio: aspectRatio.replace(':', '/') }}
+          {previewItems.length > 0 ? (
+            <MediaPreview
+              items={previewItems}
+              selectedIndex={data.selectedResultIndex || 0}
+              onNavigate={handlePreviewNavigate}
+              onDelete={handlePreviewDelete}
+              emptyAspectRatio={aspectRatio.replace(':', '/')}
             />
-          ) : inputImageUrl ? (
-            <>
-              {previewLayout ? (
-                <div
-                  className="relative checkerboard rounded-2xl overflow-hidden mx-auto"
-                  style={{ width: previewLayout.containerW, height: previewLayout.containerH }}
-                >
-                  <img
-                    src={inputImageUrl}
-                    alt="Preview"
-                    className="absolute object-cover"
-                    style={{
-                      left: previewLayout.imgLeft,
-                      top: previewLayout.imgTop,
-                      width: previewLayout.imgW,
-                      height: previewLayout.imgH,
-                    }}
-                  />
-                </div>
-              ) : (
-                <div className="rounded-2xl aspect-square" style={{ backgroundColor: theme.previewBg }} />
-              )}
-            </>
           ) : (
-            <div className="rounded-2xl p-8 text-center aspect-square flex items-center justify-center" style={{ backgroundColor: theme.previewBg }}>
-              <span className="text-zinc-500 text-sm">Connect an image</span>
-            </div>
+            <MediaPreview
+              items={[]}
+              selectedIndex={0}
+              onNavigate={() => {}}
+              onDelete={() => {}}
+              emptyState={isRunning ? 'shimmer' : 'checkerboard'}
+              emptyAspectRatio={aspectRatio.replace(':', '/')}
+            />
           )}
 
           {/* Aspect Ratio selector */}
@@ -382,13 +358,6 @@ export function AiResizeNode(props: NodeProps) {
               options={ASPECT_RATIOS.map((r) => ({ value: r, label: r }))}
             />
           </div>
-
-          {/* Error */}
-          {data.status === 'error' && data.errorMessage && (
-            <div className="mt-2 text-[10px] text-red-400 truncate self-stretch" title={data.errorMessage}>
-              {data.errorMessage}
-            </div>
-          )}
 
           {/* Run button */}
           <div className="mt-3 flex justify-end self-stretch">

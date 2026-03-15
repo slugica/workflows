@@ -5,10 +5,11 @@ import { createPortal } from 'react-dom';
 import { Handle, Position, useEdges, useNodes, NodeResizer, type NodeProps } from '@xyflow/react';
 import { FlowNodeData, HANDLE_COLORS, resolveFileHandleColor } from '@/lib/types';
 import { useFlowStore } from '@/store/flowStore';
-import { Upload, Type, ImageIcon, Video, AudioLines, Play, Loader, Trash2 } from 'lucide-react';
-import { ResultNavOverlay } from '@/components/nodes/ResultNavOverlay';
+import { Upload, Type, ImageIcon, Video, AudioLines, Play, Loader, Plus } from 'lucide-react';
+import { MediaPreview, type MediaItem } from '@/components/nodes/MediaPreview';
 import { QuickActionsBar, type QuickActionMode } from '@/components/nodes/QuickActionsBar';
 import { theme } from '@/lib/theme';
+import { uploadFile } from '@/lib/uploadFile';
 
 const TYPE_ICONS: Record<string, ReactNode> = {
   import: <Upload size={18} />,
@@ -49,6 +50,7 @@ export function BaseNode(props: NodeProps) {
   const selectNode = useFlowStore((s) => s.selectNode);
   const nodeType: string = String(props.type || 'import');
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const addMoreInputRef = useRef<HTMLInputElement>(null);
   const edges = useEdges();
   const allNodes = useNodes();
   const connectedHandles = useMemo(() => {
@@ -85,9 +87,9 @@ export function BaseNode(props: NodeProps) {
   const [uploadError, setUploadError] = useState<string | null>(null);
 
   const handleFileSelect = useCallback(async (file: File) => {
-    const MAX_SIZE = 30 * 1024 * 1024; // 30MB
+    const MAX_SIZE = 50 * 1024 * 1024;
     if (file.size > MAX_SIZE) {
-      setUploadError(`File too large (${(file.size / 1024 / 1024).toFixed(1)}MB). Max 30MB.`);
+      setUploadError(`File too large (${(file.size / 1024 / 1024).toFixed(1)}MB). Max 50MB.`);
       return;
     }
     setUploadError(null);
@@ -99,23 +101,170 @@ export function BaseNode(props: NodeProps) {
     store.updateNodeSetting(id, 'uploading', true);
 
     try {
-      const formData = new FormData();
-      formData.append('file', file);
-      const res = await fetch('/api/fal/upload', { method: 'POST', body: formData });
-      const json = await res.json();
-      if (json.url) {
-        store.updateNodeSetting(id, 'remoteUrl', json.url);
-        URL.revokeObjectURL(localUrl);
-        store.updateNodeSetting(id, 'fileUrl', json.url);
-      } else {
-        console.error('Upload failed:', json.error);
-      }
+      const { url, thumbnail } = await uploadFile(file);
+      URL.revokeObjectURL(localUrl);
+      const s = useFlowStore.getState();
+      s.updateNodeSetting(id, 'remoteUrl', url);
+      s.updateNodeSetting(id, 'fileUrl', url);
+      if (thumbnail) s.updateNodeSetting(id, 'videoThumbnail', thumbnail);
     } catch (err) {
       console.error('Upload error:', err);
     } finally {
-      store.updateNodeSetting(id, 'uploading', false);
+      useFlowStore.getState().updateNodeSetting(id, 'uploading', false);
     }
   }, [id]);
+
+  const handleAddMore = useCallback(async (file: File) => {
+    const MAX_SIZE = 50 * 1024 * 1024;
+    if (file.size > MAX_SIZE) {
+      console.warn('File too large:', file.size);
+      return;
+    }
+    const format = file.type.startsWith('video/') ? 'video' : file.type.startsWith('audio/') ? 'audio' : 'image';
+
+    // Add placeholder immediately
+    const store0 = useFlowStore.getState();
+    const curData = store0.nodes.find(n => n.id === id)?.data as unknown as FlowNodeData;
+    const existing = [...(curData?.results || [])];
+    if (existing.length === 0 && curData?.settings?.fileUrl) {
+      const curFmt = (curData.settings.fileType as string)?.startsWith('video/') ? 'video'
+        : (curData.settings.fileType as string)?.startsWith('audio/') ? 'audio' : 'image';
+      const firstThumb = curData.settings.videoThumbnail as string | undefined;
+      existing.push({ file: { content: curData.settings.fileUrl as string, format: curFmt, ...(firstThumb ? { thumbnail: firstThumb } : {}) } });
+    }
+    const placeholderIdx = existing.length;
+    const withPlaceholder = [...existing, { file: { content: '', format, loading: true } }];
+    store0.updateNodeData(id, { results: withPlaceholder, selectedResultIndex: placeholderIdx, status: 'done' });
+
+    try {
+      const { url, thumbnail } = await uploadFile(file);
+      const store = useFlowStore.getState();
+      const freshData = store.nodes.find(n => n.id === id)?.data as unknown as FlowNodeData;
+      const latest = [...(freshData?.results || [])];
+      const entry = { content: url, format, ...(thumbnail ? { thumbnail } : {}) };
+      if (placeholderIdx < latest.length) {
+        latest[placeholderIdx] = { file: entry };
+      } else {
+        latest.push({ file: entry });
+      }
+      store.updateNodeData(id, {
+        results: latest,
+        selectedResultIndex: placeholderIdx,
+        settings: { ...freshData.settings, fileUrl: url, fileType: file.type, fileName: file.name },
+      });
+    } catch (err) {
+      console.error('Upload error:', err);
+      const store = useFlowStore.getState();
+      const freshData = store.nodes.find(n => n.id === id)?.data as unknown as FlowNodeData;
+      const latest = [...(freshData?.results || [])];
+      if (placeholderIdx < latest.length) {
+        latest.splice(placeholderIdx, 1);
+      }
+      const newIdx = Math.max(0, Math.min(placeholderIdx - 1, latest.length - 1));
+      store.updateNodeData(id, { results: latest, selectedResultIndex: newIdx });
+    }
+  }, [id]);
+
+  // Build unified media items for import nodes
+  const importItems = useMemo((): MediaItem[] => {
+    if (nodeType !== 'import') return [];
+    // If we have results array (multiple files), use that
+    if (data.results && data.results.length > 0) {
+      return data.results.map(r => {
+        const entry = Object.values(r)[0];
+        return {
+          content: entry?.content || '',
+          format: (entry?.format === 'video' ? 'video' : entry?.format === 'audio' ? 'audio' : 'image') as MediaItem['format'],
+          loading: !!entry?.loading,
+          label: data.settings.fileName as string | undefined,
+          thumbnail: entry?.thumbnail as string | undefined,
+        };
+      });
+    }
+    // Single file from settings
+    if (data.settings.fileUrl) {
+      const ft = data.settings.fileType as string | undefined;
+      const fmt: MediaItem['format'] = ft?.startsWith('video/') ? 'video' : ft?.startsWith('audio/') ? 'audio' : 'image';
+      return [{
+        content: data.settings.fileUrl as string,
+        format: fmt,
+        loading: !!data.settings.uploading,
+        label: data.settings.fileName as string | undefined,
+        thumbnail: data.settings.videoThumbnail as string | undefined,
+      }];
+    }
+    return [];
+  }, [nodeType, data.results, data.settings.fileUrl, data.settings.fileType, data.settings.uploading, data.settings.fileName, data.settings.videoThumbnail]);
+
+  // Build unified media items for AI result nodes
+  const aiItems = useMemo((): MediaItem[] => {
+    if (nodeType === 'import' || !data.results?.length) return [];
+    return data.results.map(r => {
+      const entry = Object.values(r)[0];
+      return {
+        content: entry?.content || '',
+        format: (entry?.format === 'video' ? 'video' : entry?.format === 'audio' ? 'audio' : 'image') as MediaItem['format'],
+        loading: !!entry?.loading,
+      };
+    });
+  }, [nodeType, data.results]);
+
+  const handleImportNavigate = useCallback((idx: number) => {
+    const store = useFlowStore.getState();
+    const freshData = store.nodes.find(n => n.id === id)?.data as unknown as FlowNodeData;
+    store.updateNodeData(id, { selectedResultIndex: idx });
+    // Sync settings.fileUrl from results (use fresh state)
+    const results = freshData?.results;
+    if (results?.[idx]) {
+      const entry = Object.values(results[idx])[0];
+      if (entry?.content && !entry.loading) {
+        const fmt = entry.format;
+        const mime = fmt === 'video' ? 'video/mp4' : fmt === 'audio' ? 'audio/mpeg' : 'image/png';
+        store.updateNodeData(id, { settings: { ...freshData.settings, fileUrl: entry.content, fileType: mime } });
+      }
+    }
+  }, [id]);
+
+  const handleImportDelete = useCallback((idx: number) => {
+    const store = useFlowStore.getState();
+    const freshData = store.nodes.find(n => n.id === id)?.data as unknown as FlowNodeData;
+    const results = freshData?.results || [];
+    if (results.length <= 1) {
+      store.updateNodeData(id, {
+        settings: { ...freshData.settings, fileUrl: undefined, fileType: undefined, fileName: undefined },
+        results: [],
+        selectedResultIndex: 0,
+        status: 'idle',
+      });
+      setImgNatural(null);
+      return;
+    }
+    const newResults = results.filter((_, i) => i !== idx);
+    const newIdx = Math.max(0, Math.min(idx, newResults.length - 1));
+    const entry = Object.values(newResults[newIdx])[0];
+    const mime = entry?.format === 'video' ? 'video/mp4' : entry?.format === 'audio' ? 'audio/mpeg' : 'image/png';
+    store.updateNodeData(id, {
+      results: newResults,
+      selectedResultIndex: newIdx,
+      settings: { ...freshData.settings, fileUrl: entry?.content, fileType: mime },
+    });
+  }, [id]);
+
+  const handleAiNavigate = useCallback((idx: number) => {
+    useFlowStore.getState().updateNodeData(id, { selectedResultIndex: idx });
+  }, [id]);
+
+  const handleAiDelete = useCallback((idx: number) => {
+    const store = useFlowStore.getState();
+    const results = data.results || [];
+    const newResults = results.filter((_, i) => i !== idx);
+    const newIdx = Math.max(0, Math.min(idx, newResults.length - 1));
+    store.updateNodeData(id, {
+      results: newResults,
+      selectedResultIndex: newIdx,
+      ...(newResults.length === 0 ? { status: 'idle' as const } : {}),
+    });
+  }, [id, data.results]);
 
   const isPrompt = nodeType === 'prompt';
 
@@ -326,67 +475,42 @@ export function BaseNode(props: NodeProps) {
                 if (file) handleFileSelect(file);
               }}
             />
-            {data.settings.fileUrl ? (
+            {importItems.length > 0 ? (
               <>
-                {/* Hidden image to get natural dimensions during upload */}
-                {data.settings.uploading && (data.settings.fileType as string)?.startsWith('image/') && (
-                  <img
-                    src={data.settings.fileUrl as string}
-                    alt=""
-                    className="hidden"
-                    onLoad={(e) => setImgNatural({ w: e.currentTarget.naturalWidth, h: e.currentTarget.naturalHeight })}
-                  />
-                )}
-                <div
-                  className="relative rounded-2xl overflow-hidden group/preview"
-                  style={{ ...( contentSize ? { width: contentSize.w, height: contentSize.h } : {}), backgroundColor: theme.previewBg }}
-                >
-                {data.settings.uploading ? (
-                  <div className="shimmer w-full h-full" style={!contentSize ? { aspectRatio: '1' } : undefined} />
-                ) : (data.settings.fileType as string)?.startsWith('video/') ? (
-                  <video
-                    src={data.settings.fileUrl as string}
-                    className="w-full h-full object-cover nodrag"
-                    controls
-                    muted
-                    preload="metadata"
-                  />
-                ) : (data.settings.fileType as string)?.startsWith('audio/') ? (
-                  <div className="flex flex-col items-center justify-center gap-3 p-6" style={{ aspectRatio: '1' }}>
-                    <AudioLines size={32} className="text-zinc-500" />
-                    <span className="text-zinc-400 text-xs truncate max-w-full">{data.settings.fileName as string}</span>
-                    <audio
-                      src={data.settings.fileUrl as string}
-                      className="w-full nodrag"
-                      controls
-                    />
-                  </div>
-                ) : (
-                  <img
-                    src={data.settings.fileUrl as string}
-                    alt={data.settings.fileName as string}
-                    className="w-full h-full object-cover"
-                    onLoad={(e) => setImgNatural({ w: e.currentTarget.naturalWidth, h: e.currentTarget.naturalHeight })}
-                  />
-                )}
-                {/* Delete button for uploaded file */}
+                <MediaPreview
+                  items={importItems}
+                  selectedIndex={data.selectedResultIndex || 0}
+                  onNavigate={handleImportNavigate}
+                  onDelete={handleImportDelete}
+                  onImageLoad={(w, h) => setImgNatural({ w, h })}
+                />
+                {/* Add More button */}
                 {!data.settings.uploading && (
-                  <div className="absolute top-2 right-2 z-10 opacity-0 group-hover/preview:opacity-100 transition-opacity duration-200">
-                    <button
-                      className="w-7 h-7 rounded-full bg-black/60 hover:bg-red-900/80 flex items-center justify-center nodrag transition-colors"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        useFlowStore.getState().updateNodeData(id, {
-                          settings: { ...data.settings, fileUrl: undefined, fileType: undefined, fileName: undefined },
-                        });
-                        setImgNatural(null);
+                  <>
+                    <input
+                      ref={addMoreInputRef}
+                      type="file"
+                      className="absolute w-0 h-0 opacity-0 overflow-hidden"
+                      accept={
+                        (data.settings.fileType as string)?.startsWith('video/') ? 'video/*'
+                          : (data.settings.fileType as string)?.startsWith('audio/') ? 'audio/*'
+                          : 'image/*'
+                      }
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (file) handleAddMore(file);
+                        e.target.value = '';
                       }}
+                    />
+                    <button
+                      className="flex items-center gap-1.5 mt-2 text-zinc-500 hover:text-zinc-300 text-xs transition-colors nodrag"
+                      onClick={(e) => { e.stopPropagation(); addMoreInputRef.current?.click(); }}
                     >
-                      <Trash2 size={12} className="text-white" />
+                      <Plus size={14} />
+                      Add More {(data.settings.fileType as string)?.startsWith('video/') ? 'Video' : (data.settings.fileType as string)?.startsWith('audio/') ? 'Audio' : 'Image'}
                     </button>
-                  </div>
+                  </>
                 )}
-              </div>
               </>
             ) : (
               <label
@@ -412,48 +536,18 @@ export function BaseNode(props: NodeProps) {
           </div>
         ) : null}
 
-        {/* Status */}
-        {data.status === 'error' && data.errorMessage ? (
-          <div className="mt-2 text-[10px] text-red-400 truncate self-stretch" title={data.errorMessage}>{data.errorMessage}</div>
-        ) : null}
+        {/* Status — errors shown via toast, no inline display */}
 
-        {/* Result placeholder or shimmer loading */}
-        {data.behavior === 'dynamic' && (!data.results || data.results.length === 0) ? (
-          data.status === 'running' ? (
-            <div className="self-stretch rounded-2xl overflow-hidden h-[320px] shimmer" style={{ backgroundColor: theme.previewBg }} />
-          ) : (
-            <div className="self-stretch rounded-2xl overflow-hidden h-[320px] checkerboard" style={{ backgroundColor: theme.previewBg }} />
-          )
-        ) : null}
-        {data.results && data.results.length > 0 ? (
+        {/* AI result preview */}
+        {data.behavior === 'dynamic' ? (
           <div className="self-stretch">
-            <div className="relative rounded-2xl overflow-hidden group/preview" style={{ backgroundColor: theme.previewBg }}>
-              {(() => {
-                const result = data.results[data.selectedResultIndex || 0];
-                if (!result) return null;
-                const entry = Object.values(result)[0];
-                if (!entry?.content) return null;
-                if (entry.format === 'video') {
-                  return (
-                    <video
-                      key={entry.content}
-                      src={entry.content}
-                      className="w-full"
-                      controls
-                      muted
-                    />
-                  );
-                }
-                return (
-                  <img
-                    src={entry.content}
-                    alt="Result"
-                    className="w-full"
-                  />
-                );
-              })()}
-              <ResultNavOverlay nodeId={id} results={data.results} selectedResultIndex={data.selectedResultIndex || 0} />
-            </div>
+            <MediaPreview
+              items={aiItems}
+              selectedIndex={data.selectedResultIndex || 0}
+              onNavigate={handleAiNavigate}
+              onDelete={handleAiDelete}
+              emptyState={data.status === 'running' ? 'shimmer' : 'checkerboard'}
+            />
           </div>
         ) : null}
 

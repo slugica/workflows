@@ -7,6 +7,7 @@ import { resolveInput } from '@/lib/resolveInput';
 import { useFlowStore } from '@/store/flowStore';
 import { ScanLine, Play, Pause, Volume2, VolumeOff } from 'lucide-react';
 import { NodeQuickActions } from './NodeQuickActions';
+import { theme } from '@/lib/theme';
 
 export function PreviewNode(props: NodeProps) {
   const { id, selected } = props;
@@ -227,11 +228,15 @@ export function PreviewNode(props: NodeProps) {
       {/* Card */}
       <div
         className={`
-          bg-[#171717] rounded-[24px] border-2 border-[#212121] relative flex flex-col items-start
+          rounded-[24px] border-2 relative flex flex-col items-start
           p-4 pt-3 w-full
           drop-shadow-sm group-hover:drop-shadow-md
           ${selected ? 'border-white/30 show-labels' : ''}
         `}
+        style={{
+          backgroundColor: theme.surface1,
+          borderColor: selected ? undefined : theme.border1,
+        }}
       >
         {/* Header */}
         <header className="mb-2 flex h-7 items-center justify-between gap-2 self-stretch">
@@ -256,7 +261,7 @@ export function PreviewNode(props: NodeProps) {
                 id={handle.id}
                 className="!relative !transform-none !w-[18px] !h-[18px] !rounded-full !border-2 !left-0 !top-0 !flex !items-center !justify-center"
                 style={{
-                  backgroundColor: isConnected ? color : '#171717',
+                  backgroundColor: isConnected ? color : theme.surface1,
                   borderColor: color,
                 }}
               >
@@ -286,7 +291,7 @@ export function PreviewNode(props: NodeProps) {
                 id={handle.id}
                 className="!relative !transform-none !w-[18px] !h-[18px] !rounded-full !border-2 !left-0 !top-0 !flex !items-center !justify-center"
                 style={{
-                  backgroundColor: isConnected ? color : '#171717',
+                  backgroundColor: isConnected ? color : theme.surface1,
                   borderColor: color,
                 }}
               >
@@ -305,8 +310,8 @@ export function PreviewNode(props: NodeProps) {
         <div className="self-stretch">
           {inputUrl ? (
             <div
-              className="bg-[#212121] rounded-2xl overflow-hidden"
-              style={contentSize ? { width: contentSize.w, height: contentSize.h } : undefined}
+              className="rounded-2xl overflow-hidden"
+              style={{ ...(contentSize ? { width: contentSize.w, height: contentSize.h } : {}), backgroundColor: theme.previewBg }}
             >
               {isVideo ? (
                 <div className="relative w-full h-full">
@@ -390,7 +395,7 @@ export function PreviewNode(props: NodeProps) {
               )}
             </div>
           ) : (
-            <div className="aspect-square bg-[#212121] rounded-2xl checkerboard flex items-center justify-center">
+            <div className="aspect-square rounded-2xl checkerboard flex items-center justify-center" style={{ backgroundColor: theme.previewBg }}>
               <span className="text-zinc-500 text-sm">Connect a file input</span>
             </div>
           )}

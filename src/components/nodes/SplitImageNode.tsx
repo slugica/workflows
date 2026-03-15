@@ -201,10 +201,8 @@ export function SplitImageNode(props: NodeProps) {
         handles: { inputs: data.handles.inputs, outputs },
       });
     } catch (err) {
-      useFlowStore.getState().updateNodeData(id, {
-        status: 'error',
-        errorMessage: err instanceof Error ? err.message : String(err),
-      });
+      useFlowStore.getState().updateNodeData(id, { status: 'idle' });
+      useFlowStore.getState().addToast(`Split Image: ${err instanceof Error ? err.message : String(err)}`);
     }
   };
 
@@ -365,11 +363,6 @@ export function SplitImageNode(props: NodeProps) {
               options={GRID_OPTIONS.map((g) => ({ value: g, label: g }))}
             />
           </div>
-
-          {/* Error */}
-          {data.status === 'error' && data.errorMessage && (
-            <div className="mt-2 text-[10px] text-red-400 truncate self-stretch" title={data.errorMessage}>{data.errorMessage}</div>
-          )}
 
           {/* Run button */}
           <div className="mt-3 flex justify-end self-stretch">

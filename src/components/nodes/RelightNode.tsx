@@ -8,6 +8,7 @@ import { ensureRemoteUrl } from '@/lib/executeNode';
 import { useFlowStore } from '@/store/flowStore';
 import { Sun, Play, Loader, ChevronLeft, ChevronRight, Trash2 } from 'lucide-react';
 import { NodeQuickActions } from './NodeQuickActions';
+import { theme } from '@/lib/theme';
 
 /* ─── Prompt generation helpers ─── */
 function getAzimuthPrompt(az: number): string {
@@ -75,7 +76,7 @@ export function RelightNode(props: NodeProps) {
   /* ─── Run handler ─── */
   const handleRun = async () => {
     if (!inputImageUrl) return;
-    useFlowStore.getState().updateNodeData(id, { status: 'running', errorMessage: '' });
+    useFlowStore.getState().updateNodeData(id, { status: 'running' });
 
     const azimuth = (data.settings.azimuth as number) ?? 0;
     const elevation = (data.settings.elevation as number) ?? 0;
@@ -124,10 +125,8 @@ export function RelightNode(props: NodeProps) {
         selectedResultIndex: allResults.length - 1,
       });
     } catch (err) {
-      useFlowStore.getState().updateNodeData(id, {
-        status: 'error',
-        errorMessage: err instanceof Error ? err.message : String(err),
-      });
+      useFlowStore.getState().updateNodeData(id, { status: 'idle' });
+      useFlowStore.getState().addToast(`Relight: ${err instanceof Error ? err.message : String(err)}`);
     }
   };
 
@@ -160,13 +159,17 @@ export function RelightNode(props: NodeProps) {
       {/* Card */}
       <div
         className={`
-          bg-[#171717] rounded-[24px] border-2 border-[#212121] relative flex flex-col items-start
+          rounded-[24px] border-2 relative flex flex-col items-start
           p-4 pt-3 w-full
           drop-shadow-sm group-hover:drop-shadow-md
           ${selected ? 'border-white/30 show-labels' : ''}
           ${isRunning ? 'border-yellow-400/50' : ''}
           ${data.status === 'error' ? 'border-red-400/50' : ''}
         `}
+        style={{
+          backgroundColor: theme.surface1,
+          borderColor: selected ? undefined : isRunning ? undefined : data.status === 'error' ? undefined : theme.border1,
+        }}
       >
         {/* Header */}
         <header className="mb-2 flex h-7 items-center justify-between gap-2 self-stretch">
@@ -190,7 +193,7 @@ export function RelightNode(props: NodeProps) {
                   id={handle.id}
                   className="!relative !transform-none !w-[18px] !h-[18px] !rounded-full !border-2 !left-0 !top-0 !flex !items-center !justify-center"
                   style={{
-                    backgroundColor: isConnected ? color : '#171717',
+                    backgroundColor: isConnected ? color : theme.surface1,
                     borderColor: color,
                   }}
                 >
@@ -220,7 +223,7 @@ export function RelightNode(props: NodeProps) {
                   id={handle.id}
                   className="!relative !transform-none !w-[18px] !h-[18px] !rounded-full !border-2 !left-0 !top-0 !flex !items-center !justify-center"
                   style={{
-                    backgroundColor: isConnected ? color : '#171717',
+                    backgroundColor: isConnected ? color : theme.surface1,
                     borderColor: color,
                   }}
                 >
@@ -244,7 +247,7 @@ export function RelightNode(props: NodeProps) {
               style={{ width: '100%', aspectRatio: ((data.settings.aspectRatio as string) || '3:4').replace(':', '/') }}
             />
           ) : resultUrl && resultMeta?.format !== 'preview' ? (
-            <div className="relative bg-[#212121] rounded-2xl overflow-hidden">
+            <div className="relative rounded-2xl overflow-hidden" style={{ backgroundColor: theme.previewBg }}>
               <img src={resultUrl} alt="Relight result" className="w-full" />
               {data.results.length > 1 && (
                 <div className="absolute top-2 left-2 right-2 flex items-center justify-between">
@@ -345,15 +348,8 @@ export function RelightNode(props: NodeProps) {
               )}
             </div>
           ) : (
-            <div className="bg-[#212121] rounded-2xl p-8 text-center aspect-square flex items-center justify-center">
+            <div className="rounded-2xl p-8 text-center aspect-square flex items-center justify-center" style={{ backgroundColor: theme.previewBg }}>
               <span className="text-zinc-500 text-sm">Connect an image</span>
-            </div>
-          )}
-
-          {/* Error */}
-          {data.status === 'error' && data.errorMessage && (
-            <div className="mt-2 text-[10px] text-red-400 truncate self-stretch" title={data.errorMessage}>
-              {data.errorMessage}
             </div>
           )}
 
@@ -364,9 +360,14 @@ export function RelightNode(props: NodeProps) {
                 isRunning
                   ? 'bg-yellow-900/50 text-yellow-400 cursor-wait border border-yellow-700/50'
                   : hasInput
-                    ? 'bg-transparent hover:bg-[#212121] text-white border border-[#292929]'
-                    : 'bg-transparent text-zinc-600 border border-[#212121] cursor-not-allowed'
+                    ? 'bg-transparent text-white'
+                    : 'bg-transparent text-zinc-600 cursor-not-allowed'
               }`}
+              style={
+                isRunning ? undefined
+                : hasInput ? { border: `1px solid ${theme.border2}` }
+                : { border: `1px solid ${theme.border1}` }
+              }
               disabled={!hasInput || isRunning}
               onClick={(e) => { e.stopPropagation(); handleRun(); }}
             >

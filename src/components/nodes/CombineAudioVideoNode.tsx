@@ -6,8 +6,9 @@ import { FlowNodeData, HANDLE_COLORS, resolveFileHandleColor } from '@/lib/types
 import { ensureRemoteUrl, executeRendi } from '@/lib/executeNode';
 import { useFlowStore } from '@/store/flowStore';
 import { Film, Play, Loader } from 'lucide-react';
-import { ResultNavOverlay } from '@/components/nodes/ResultNavOverlay';
+import { MediaPreview, type MediaItem } from '@/components/nodes/MediaPreview';
 import { NodeQuickActions } from './NodeQuickActions';
+import { theme } from '@/lib/theme';
 
 /**
  * Resolve a single input URL by handle type substring (e.g. 'input:video' or 'input:audio').
@@ -73,13 +74,33 @@ export function CombineAudioVideoNode(props: NodeProps) {
     [id, allNodes, edges]
   );
 
-  // Result
-  const resultEntry = data.results?.length
-    ? data.results[data.selectedResultIndex || 0]
-    : null;
-  const resultMeta = resultEntry ? Object.values(resultEntry)[0] : null;
-  const resultUrl = resultMeta?.content || null;
-  const isPlaceholder = resultMeta?.loading === true;
+  const previewItems = useMemo((): MediaItem[] => {
+    if (!data.results?.length) return [];
+    return data.results.map(r => {
+      const entry = Object.values(r)[0];
+      return {
+        content: entry?.content || '',
+        format: (entry?.format === 'video' ? 'video' : entry?.format === 'audio' ? 'audio' : 'image') as MediaItem['format'],
+        loading: !!entry?.loading,
+      };
+    });
+  }, [data.results]);
+
+  const handlePreviewNavigate = useCallback((idx: number) => {
+    useFlowStore.getState().updateNodeData(id, { selectedResultIndex: idx });
+  }, [id]);
+
+  const handlePreviewDelete = useCallback((idx: number) => {
+    const store = useFlowStore.getState();
+    const results = data.results || [];
+    const newResults = results.filter((_, i) => i !== idx);
+    const newIdx = Math.max(0, Math.min(idx, newResults.length - 1));
+    store.updateNodeData(id, {
+      results: newResults,
+      selectedResultIndex: newIdx,
+      ...(newResults.length === 0 ? { status: 'idle' as const } : {}),
+    });
+  }, [id, data.results]);
 
   const handleRun = useCallback(async () => {
     if (!videoUrl || !audioUrl) return;
@@ -92,7 +113,6 @@ export function CombineAudioVideoNode(props: NodeProps) {
 
     useFlowStore.getState().updateNodeData(id, {
       status: 'running',
-      errorMessage: '',
       results: withPlaceholder,
       selectedResultIndex: placeholderIdx,
     });
@@ -129,11 +149,11 @@ export function CombineAudioVideoNode(props: NodeProps) {
       const newIdx = Math.min(latestData?.selectedResultIndex || 0, Math.max(0, latestResults.length - 1));
 
       useFlowStore.getState().updateNodeData(id, {
-        status: latestResults.length > 0 ? 'done' : 'error',
-        errorMessage: err instanceof Error ? err.message : String(err),
+        status: latestResults.length > 0 ? 'done' : 'idle',
         results: latestResults,
         selectedResultIndex: newIdx,
       });
+      useFlowStore.getState().addToast(`Combine Audio & Video: ${err instanceof Error ? err.message : String(err)}`);
     }
   }, [id, videoUrl, audioUrl]);
 
@@ -161,13 +181,17 @@ export function CombineAudioVideoNode(props: NodeProps) {
       {/* Card */}
       <div
         className={`
-          bg-[#171717] rounded-[24px] border-2 border-[#212121] relative flex flex-col items-start
+          rounded-[24px] border-2 relative flex flex-col items-start
           p-4 pt-3 w-full
           drop-shadow-sm group-hover:drop-shadow-md
           ${selected ? 'border-white/30 show-labels' : ''}
           ${isRunning ? 'border-yellow-400/50' : ''}
           ${data.status === 'error' ? 'border-red-400/50' : ''}
         `}
+        style={{
+          backgroundColor: theme.surface1,
+          borderColor: selected ? undefined : isRunning ? undefined : data.status === 'error' ? undefined : theme.border1,
+        }}
       >
         {/* Header */}
         <header className="mb-2 flex h-7 items-center justify-between gap-2 self-stretch">
@@ -193,7 +217,7 @@ export function CombineAudioVideoNode(props: NodeProps) {
                   id={handle.id}
                   className="!relative !transform-none !w-[18px] !h-[18px] !rounded-full !border-2 !left-0 !top-0 !flex !items-center !justify-center"
                   style={{
-                    backgroundColor: isConnected ? color : '#171717',
+                    backgroundColor: isConnected ? color : theme.surface1,
                     borderColor: color,
                   }}
                 >
@@ -223,7 +247,7 @@ export function CombineAudioVideoNode(props: NodeProps) {
                   id={handle.id}
                   className="!relative !transform-none !w-[18px] !h-[18px] !rounded-full !border-2 !left-0 !top-0 !flex !items-center !justify-center"
                   style={{
-                    backgroundColor: isConnected ? color : '#171717',
+                    backgroundColor: isConnected ? color : theme.surface1,
                     borderColor: color,
                   }}
                 >
@@ -241,25 +265,16 @@ export function CombineAudioVideoNode(props: NodeProps) {
 
         {/* Content */}
         <div className="self-stretch">
-          {isPlaceholder ? (
-            <div className="relative bg-[#212121] rounded-2xl overflow-hidden group/preview">
-              <ResultNavOverlay nodeId={id} results={data.results} selectedResultIndex={data.selectedResultIndex || 0} />
-              <div className="shimmer w-full aspect-video" />
-            </div>
-          ) : resultUrl ? (
-            <div className="relative bg-[#212121] rounded-2xl overflow-hidden group/preview">
-              <ResultNavOverlay nodeId={id} results={data.results} selectedResultIndex={data.selectedResultIndex || 0} />
-              <video
-                key={resultUrl}
-                src={resultUrl}
-                className="w-full"
-                controls
-                playsInline
-                preload="metadata"
-              />
-            </div>
+          {previewItems.length > 0 ? (
+            <MediaPreview
+              items={previewItems}
+              selectedIndex={data.selectedResultIndex || 0}
+              onNavigate={handlePreviewNavigate}
+              onDelete={handlePreviewDelete}
+              emptyAspectRatio="16/9"
+            />
           ) : (
-            <div className="aspect-video bg-[#212121] rounded-2xl checkerboard flex items-center justify-center">
+            <div className="aspect-video rounded-2xl checkerboard flex items-center justify-center" style={{ backgroundColor: theme.previewBg }}>
               <span className="text-zinc-500 text-sm">
                 {!videoUrl && !audioUrl
                   ? 'Connect video and audio'
@@ -270,13 +285,6 @@ export function CombineAudioVideoNode(props: NodeProps) {
             </div>
           )}
 
-          {/* Error */}
-          {data.status === 'error' && data.errorMessage && (
-            <div className="mt-2 text-[10px] text-red-400 truncate self-stretch" title={data.errorMessage}>
-              {data.errorMessage}
-            </div>
-          )}
-
           {/* Run button */}
           <div className="mt-3 flex justify-end self-stretch">
             <button
@@ -284,9 +292,10 @@ export function CombineAudioVideoNode(props: NodeProps) {
                 isRunning
                   ? 'bg-yellow-900/50 text-yellow-400 cursor-wait border border-yellow-700/50'
                   : canRun
-                    ? 'bg-transparent hover:bg-[#212121] text-white border border-[#292929]'
-                    : 'bg-transparent text-zinc-600 border border-[#212121] cursor-not-allowed'
+                    ? 'bg-transparent text-white'
+                    : 'bg-transparent text-zinc-600 cursor-not-allowed'
               }`}
+              style={isRunning ? undefined : { border: `1px solid ${canRun ? theme.border2 : theme.border1}` }}
               disabled={!canRun}
               onClick={(e) => { e.stopPropagation(); handleRun(); }}
             >

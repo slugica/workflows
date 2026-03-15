@@ -12,6 +12,7 @@ import {
 } from '@xyflow/react';
 import { FlowNodeData, FlowNodeType, NODE_TEMPLATES, HandleDef, detectMediaType } from '@/lib/types';
 import { executeNode } from '@/lib/executeNode';
+import { uploadFile } from '@/lib/uploadFile';
 
 interface Snapshot {
   nodes: Node[];
@@ -53,6 +54,9 @@ interface FlowState {
   ungroupSection: (sectionId: string) => void;
   toJSON: () => string;
   loadJSON: (json: string) => void;
+  toasts: { id: string; message: string; type: 'error' | 'info' }[];
+  addToast: (message: string, type?: 'error' | 'info') => void;
+  removeToast: (id: string) => void;
 }
 
 function generateId() {
@@ -75,6 +79,15 @@ export const useFlowStore = create<FlowState>((set, get) => ({
   redoStack: [],
   drawingMode: 'none',
   setDrawingMode: (mode) => set({ drawingMode: mode }),
+  toasts: [],
+  addToast: (message, type = 'error') => {
+    const id = crypto.randomUUID();
+    set((s) => ({ toasts: [...s.toasts, { id, message, type }] }));
+    setTimeout(() => {
+      set((s) => ({ toasts: s.toasts.filter((t) => t.id !== id) }));
+    }, 5000);
+  },
+  removeToast: (id) => set((s) => ({ toasts: s.toasts.filter((t) => t.id !== id) })),
   connectingHandleType: null,
   setConnectingHandleType: (type) => set({ connectingHandleType: type }),
 
@@ -663,7 +676,8 @@ export const useFlowStore = create<FlowState>((set, get) => ({
     if (!node) return;
 
     // Set running status
-    store.updateNodeData(id, { status: 'running', errorMessage: '' });
+    store.updateNodeData(id, { status: 'running' });
+    const nodeName = (node.data as unknown as FlowNodeData).name || node.type || id;
 
     try {
       const result = await executeNode(id, get().nodes, get().edges);
@@ -677,51 +691,39 @@ export const useFlowStore = create<FlowState>((set, get) => ({
           selectedResultIndex: allResults.length - 1,
         });
       } else {
-        store.updateNodeData(id, {
-          status: 'error',
-          errorMessage: result.error || 'Unknown error',
-        });
+        store.updateNodeData(id, { status: 'idle' });
+        get().addToast(`${nodeName}: ${result.error || 'Unknown error'}`);
       }
     } catch (err) {
-      store.updateNodeData(id, {
-        status: 'error',
-        errorMessage: err instanceof Error ? err.message : String(err),
-      });
+      store.updateNodeData(id, { status: 'idle' });
+      get().addToast(`${nodeName}: ${err instanceof Error ? err.message : String(err)}`);
     }
   },
 
   uploadFileToNewNode: (file, position) => {
-    const MAX_SIZE = 30 * 1024 * 1024; // 30MB
+    const MAX_SIZE = 50 * 1024 * 1024;
     if (file.size > MAX_SIZE) {
-      console.warn(`File too large (${(file.size / 1024 / 1024).toFixed(1)}MB). Max 30MB.`);
+      console.warn(`File too large (${(file.size / 1024 / 1024).toFixed(1)}MB). Max 50MB.`);
       return;
     }
-    // Create the node
     get().addNode('import', 'Import', position);
-
-    // Get the newly created node (last selected)
     const nodeId = get().selectedNodeId;
     if (!nodeId) return;
 
-    const store = get();
     const localUrl = URL.createObjectURL(file);
-    store.updateNodeSetting(nodeId, 'fileName', file.name);
-    store.updateNodeSetting(nodeId, 'fileUrl', localUrl);
-    store.updateNodeSetting(nodeId, 'fileType', file.type);
-    store.updateNodeSetting(nodeId, 'uploading', true);
+    const s = get();
+    s.updateNodeSetting(nodeId, 'fileName', file.name);
+    s.updateNodeSetting(nodeId, 'fileUrl', localUrl);
+    s.updateNodeSetting(nodeId, 'fileType', file.type);
+    s.updateNodeSetting(nodeId, 'uploading', true);
 
-    fetch('/api/fal/upload', {
-      method: 'POST',
-      body: (() => { const fd = new FormData(); fd.append('file', file); return fd; })(),
-    })
-      .then((res) => { if (!res.ok) throw new Error('Upload failed'); return res.json(); })
-      .then((json) => {
-        if (json.url) {
-          const s = useFlowStore.getState();
-          s.updateNodeSetting(nodeId, 'remoteUrl', json.url);
-          URL.revokeObjectURL(localUrl);
-          s.updateNodeSetting(nodeId, 'fileUrl', json.url);
-        }
+    uploadFile(file)
+      .then(({ url, thumbnail }) => {
+        const st = useFlowStore.getState();
+        URL.revokeObjectURL(localUrl);
+        st.updateNodeSetting(nodeId, 'remoteUrl', url);
+        st.updateNodeSetting(nodeId, 'fileUrl', url);
+        if (thumbnail) st.updateNodeSetting(nodeId, 'videoThumbnail', thumbnail);
       })
       .catch((err) => console.error('Upload error:', err))
       .finally(() => {

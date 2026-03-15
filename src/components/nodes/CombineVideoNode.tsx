@@ -7,7 +7,7 @@ import { ensureRemoteUrl, executeRendi } from '@/lib/executeNode';
 import { useFlowStore } from '@/store/flowStore';
 import { Film, Play, Loader } from 'lucide-react';
 import { NodeSelect, NodeLabel } from './controls';
-import { ResultNavOverlay } from '@/components/nodes/ResultNavOverlay';
+import { MediaPreview, type MediaItem } from '@/components/nodes/MediaPreview';
 import { NodeQuickActions } from './NodeQuickActions';
 import { theme } from '@/lib/theme';
 
@@ -153,6 +153,34 @@ export function CombineVideoNode(props: NodeProps) {
   const resultUrl = resultMeta?.content || null;
   const isPlaceholder = resultMeta?.loading === true;
 
+  const previewItems = useMemo((): MediaItem[] => {
+    if (!data.results?.length) return [];
+    return data.results.map(r => {
+      const entry = Object.values(r)[0];
+      return {
+        content: entry?.content || '',
+        format: (entry?.format === 'video' ? 'video' : entry?.format === 'audio' ? 'audio' : 'image') as MediaItem['format'],
+        loading: !!entry?.loading,
+      };
+    });
+  }, [data.results]);
+
+  const handlePreviewNavigate = useCallback((idx: number) => {
+    useFlowStore.getState().updateNodeData(id, { selectedResultIndex: idx });
+  }, [id]);
+
+  const handlePreviewDelete = useCallback((idx: number) => {
+    const store = useFlowStore.getState();
+    const results = data.results || [];
+    const newResults = results.filter((_, i) => i !== idx);
+    const newIdx = Math.max(0, Math.min(idx, newResults.length - 1));
+    store.updateNodeData(id, {
+      results: newResults,
+      selectedResultIndex: newIdx,
+      ...(newResults.length === 0 ? { status: 'idle' as const } : {}),
+    });
+  }, [id, data.results]);
+
   // Video metadata for xfade offset calculation and resolution normalization
   const [videoMetas, setVideoMetas] = useState<Map<string, VideoMeta>>(new Map());
 
@@ -177,7 +205,6 @@ export function CombineVideoNode(props: NodeProps) {
 
     useFlowStore.getState().updateNodeData(id, {
       status: 'running',
-      errorMessage: '',
       results: withPlaceholder,
       selectedResultIndex: placeholderIdx,
     });
@@ -308,11 +335,11 @@ export function CombineVideoNode(props: NodeProps) {
       const newIdx = Math.min(latestData?.selectedResultIndex || 0, Math.max(0, latestResults.length - 1));
 
       useFlowStore.getState().updateNodeData(id, {
-        status: latestResults.length > 0 ? 'done' : 'error',
-        errorMessage: err instanceof Error ? err.message : String(err),
+        status: latestResults.length > 0 ? 'done' : 'idle',
         results: latestResults,
         selectedResultIndex: newIdx,
       });
+      useFlowStore.getState().addToast(`Combine Video: ${err instanceof Error ? err.message : String(err)}`);
     }
   }, [id, connectedVideos, transition, videoMetas]);
 
@@ -429,23 +456,15 @@ export function CombineVideoNode(props: NodeProps) {
         {/* Content */}
         <div className="self-stretch">
           {/* Preview area */}
-          {isPlaceholder ? (
-            <div className="relative rounded-2xl overflow-hidden group/preview" style={{ backgroundColor: theme.previewBg }}>
-              <ResultNavOverlay nodeId={id} results={data.results} selectedResultIndex={data.selectedResultIndex || 0} />
-              <div className="shimmer w-full aspect-video" />
-            </div>
-          ) : resultUrl ? (
-            <div className="relative rounded-2xl overflow-hidden group/preview" style={{ backgroundColor: theme.previewBg }}>
-              <ResultNavOverlay nodeId={id} results={data.results} selectedResultIndex={data.selectedResultIndex || 0} />
-              <video
-                key={resultUrl}
-                src={resultUrl}
-                className="w-full"
-                controls
-                playsInline
-                preload="metadata"
-              />
-            </div>
+          {previewItems.length > 0 ? (
+            <MediaPreview
+              items={previewItems}
+              selectedIndex={data.selectedResultIndex || 0}
+              onNavigate={handlePreviewNavigate}
+              onDelete={handlePreviewDelete}
+              emptyState="checkerboard"
+              emptyAspectRatio="16/9"
+            />
           ) : (
             <div className="aspect-video rounded-2xl checkerboard flex items-center justify-center" style={{ backgroundColor: theme.previewBg }}>
               <span className="text-zinc-500 text-sm">
@@ -468,13 +487,6 @@ export function CombineVideoNode(props: NodeProps) {
               options={TRANSITIONS}
             />
           </div>
-
-          {/* Error */}
-          {data.status === 'error' && data.errorMessage && (
-            <div className="mt-2 text-[10px] text-red-400 truncate self-stretch" title={data.errorMessage}>
-              {data.errorMessage}
-            </div>
-          )}
 
           {/* Run button */}
           <div className="mt-3 flex justify-end self-stretch">

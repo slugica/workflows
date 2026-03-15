@@ -3,6 +3,7 @@
 import { useEffect, useRef } from 'react';
 import { useFlowStore } from '@/store/flowStore';
 import { FlowNodeData } from '@/lib/types';
+import { theme } from '@/lib/theme';
 
 const STORAGE_KEY = 'flow-editor-autosave';
 
@@ -75,10 +76,10 @@ export function Toolbar() {
   };
 
   return (
-    <div className="h-12 bg-[#0F0F0F] border-b border-[#212121] flex items-center justify-between px-4">
+    <div className="h-12 flex items-center justify-between px-4" style={{ backgroundColor: theme.panelBg, borderBottom: `1px solid ${theme.panelBorder}` }}>
       <div className="flex items-center gap-3">
         <h1 className="text-sm font-bold text-zinc-200">Flow Editor</h1>
-        <span className="text-[10px] text-zinc-600 bg-[#212121] px-2 py-0.5 rounded">
+        <span className="text-[10px] text-zinc-600 px-2 py-0.5 rounded" style={{ backgroundColor: theme.surface2 }}>
           prototype
         </span>
       </div>
@@ -93,19 +94,22 @@ export function Toolbar() {
         />
         <button
           onClick={handleNew}
-          className="text-xs px-3 py-1.5 rounded-lg bg-[#212121] hover:bg-[#2a2a2a] text-zinc-300 transition-colors"
+          className="text-xs px-3 py-1.5 rounded-lg text-zinc-300 transition-colors hover:brightness-125"
+          style={{ backgroundColor: theme.surface2 }}
         >
           New
         </button>
         <button
           onClick={handleImport}
-          className="text-xs px-3 py-1.5 rounded-lg bg-[#212121] hover:bg-[#2a2a2a] text-zinc-300 transition-colors"
+          className="text-xs px-3 py-1.5 rounded-lg text-zinc-300 transition-colors hover:brightness-125"
+          style={{ backgroundColor: theme.surface2 }}
         >
           Import
         </button>
         <button
           onClick={handleExport}
-          className="text-xs px-3 py-1.5 rounded-lg bg-[#212121] hover:bg-[#2a2a2a] text-zinc-300 transition-colors"
+          className="text-xs px-3 py-1.5 rounded-lg text-zinc-300 transition-colors hover:brightness-125"
+          style={{ backgroundColor: theme.surface2 }}
         >
           Export
         </button>
