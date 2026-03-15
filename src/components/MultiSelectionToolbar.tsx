@@ -130,7 +130,13 @@ export function MultiSelectionToolbar() {
     }
   }, [selectedNodes]);
 
-  if (!bbox || selectedNodes.length < 2 || mouseDown) return null;
+  // Hide if all selected nodes belong to the same section (section toolbar handles it)
+  const allInSameSection = selectedNodes.length > 0
+    && selectedNodes[0].parentId
+    && selectedNodes.every((n) => n.parentId === selectedNodes[0].parentId)
+    && rfNodes.some((n) => n.id === selectedNodes[0].parentId && n.selected);
+
+  if (!bbox || selectedNodes.length < 2 || mouseDown || allInSameSection) return null;
 
   // Convert flow bbox center-top to screen coords using React Flow's built-in transform
   const centerX = (bbox.minX + bbox.maxX) / 2;

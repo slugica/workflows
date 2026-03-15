@@ -5,9 +5,10 @@ import { createPortal } from 'react-dom';
 import { Handle, Position, useEdges, useNodes, NodeResizer, type NodeProps } from '@xyflow/react';
 import { FlowNodeData, HANDLE_COLORS, resolveFileHandleColor } from '@/lib/types';
 import { useFlowStore } from '@/store/flowStore';
-import { Upload, Type, ImageIcon, Video, AudioLines, Play, Loader } from 'lucide-react';
+import { Upload, Type, ImageIcon, Video, AudioLines, Play, Loader, Trash2 } from 'lucide-react';
 import { ResultNavOverlay } from '@/components/nodes/ResultNavOverlay';
 import { QuickActionsBar, type QuickActionMode } from '@/components/nodes/QuickActionsBar';
+import { theme } from '@/lib/theme';
 
 const TYPE_ICONS: Record<string, ReactNode> = {
   import: <Upload size={18} />,
@@ -188,7 +189,8 @@ export function BaseNode(props: NodeProps) {
         >
           <img src={imageUrl} alt="" className="max-w-[90vw] max-h-[90vh] object-contain" />
           <button
-            className="absolute top-6 right-6 w-10 h-10 flex items-center justify-center rounded-full bg-[#1a1a1a] border border-[#333] text-white hover:bg-[#333] transition-colors"
+            className="absolute top-6 right-6 w-10 h-10 flex items-center justify-center rounded-full text-white transition-colors"
+            style={{ backgroundColor: theme.surface3, border: `1px solid ${theme.border3}` }}
             onClick={() => setShowFullscreen(false)}
           >
             &times;
@@ -210,13 +212,17 @@ export function BaseNode(props: NodeProps) {
       {/* Card */}
       <div
         className={`
-          bg-[#171717] rounded-[24px] border-2 border-[#212121] relative flex flex-col items-start
+          rounded-[24px] border-2 relative flex flex-col items-start
           p-4 pt-3 w-full ${isPrompt ? 'flex-1' : ''}
           drop-shadow-sm group-hover:drop-shadow-md
           ${selected ? 'border-white/30 show-labels' : ''}
           ${data.status === 'running' ? 'border-yellow-400/50' : ''}
           ${data.status === 'error' ? 'border-red-400/50' : ''}
         `}
+        style={{
+          backgroundColor: theme.surface1,
+          borderColor: selected ? undefined : data.status === 'running' ? undefined : data.status === 'error' ? undefined : theme.border1,
+        }}
       >
         {/* Header */}
         <header className="mb-2 flex h-7 items-center justify-between gap-2 self-stretch">
@@ -225,7 +231,7 @@ export function BaseNode(props: NodeProps) {
             {TYPE_LABELS[nodeType] || nodeType}
           </h3>
           {data.behavior === 'dynamic' ? (
-            <span className="text-[10px] px-1.5 py-0.5 rounded bg-[#212121] text-zinc-400">
+            <span className="text-[10px] px-1.5 py-0.5 rounded text-zinc-400" style={{ backgroundColor: theme.surface2 }}>
               AI
             </span>
           ) : null}
@@ -247,7 +253,7 @@ export function BaseNode(props: NodeProps) {
                   id={handle.id}
                   className="!relative !transform-none !w-[18px] !h-[18px] !rounded-full !border-2 !left-0 !top-0 !flex !items-center !justify-center"
                   style={{
-                    backgroundColor: isConnected ? color : '#171717',
+                    backgroundColor: isConnected ? color : theme.surface1,
                     borderColor: color,
                   }}
                 >
@@ -278,7 +284,7 @@ export function BaseNode(props: NodeProps) {
                   id={handle.id}
                   className="!relative !transform-none !w-[18px] !h-[18px] !rounded-full !border-2 !left-0 !top-0 !flex !items-center !justify-center"
                   style={{
-                    backgroundColor: isConnected ? color : '#171717',
+                    backgroundColor: isConnected ? color : theme.surface1,
                     borderColor: color,
                   }}
                 >
@@ -297,7 +303,8 @@ export function BaseNode(props: NodeProps) {
         {/* Content area */}
         {nodeType === 'prompt' ? (
           <textarea
-            className="w-full h-full min-h-[172px] bg-[#212121] rounded-xl text-white text-base leading-6 p-3 resize-none border-none focus:outline-none focus:ring-0 nodrag nowheel nopan self-stretch flex-1"
+            className="w-full h-full min-h-[172px] rounded-xl text-white text-base leading-6 p-3 resize-none border-none focus:outline-none focus:ring-0 nodrag nowheel nopan self-stretch flex-1"
+            style={{ backgroundColor: theme.surface2 }}
             placeholder="Enter your prompt here..."
             defaultValue={(data.settings.promptText as string) || ''}
             onChange={(e) => {
@@ -331,8 +338,8 @@ export function BaseNode(props: NodeProps) {
                   />
                 )}
                 <div
-                  className="relative bg-[#212121] rounded-2xl overflow-hidden"
-                  style={contentSize ? { width: contentSize.w, height: contentSize.h } : undefined}
+                  className="relative rounded-2xl overflow-hidden group/preview"
+                  style={{ ...( contentSize ? { width: contentSize.w, height: contentSize.h } : {}), backgroundColor: theme.previewBg }}
                 >
                 {data.settings.uploading ? (
                   <div className="shimmer w-full h-full" style={!contentSize ? { aspectRatio: '1' } : undefined} />
@@ -362,12 +369,32 @@ export function BaseNode(props: NodeProps) {
                     onLoad={(e) => setImgNatural({ w: e.currentTarget.naturalWidth, h: e.currentTarget.naturalHeight })}
                   />
                 )}
+                {/* Delete button for uploaded file */}
+                {!data.settings.uploading && (
+                  <div className="absolute top-2 right-2 z-10 opacity-0 group-hover/preview:opacity-100 transition-opacity duration-200">
+                    <button
+                      className="w-7 h-7 rounded-full bg-black/60 hover:bg-red-900/80 flex items-center justify-center nodrag transition-colors"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        useFlowStore.getState().updateNodeData(id, {
+                          settings: { ...data.settings, fileUrl: undefined, fileType: undefined, fileName: undefined },
+                        });
+                        setImgNatural(null);
+                      }}
+                    >
+                      <Trash2 size={12} className="text-white" />
+                    </button>
+                  </div>
+                )}
               </div>
               </>
             ) : (
               <label
                 htmlFor={`file-input-${id}`}
-                className="bg-[#212121] rounded-2xl p-8 text-center cursor-pointer hover:bg-[#292929] transition-colors nodrag block aspect-square flex flex-col items-center justify-center gap-2"
+                className="rounded-2xl p-8 text-center cursor-pointer transition-colors nodrag block aspect-square flex flex-col items-center justify-center gap-2"
+                style={{ backgroundColor: theme.surface2 }}
+                onMouseOver={(e) => { e.currentTarget.style.backgroundColor = theme.surfaceHover; }}
+                onMouseOut={(e) => { e.currentTarget.style.backgroundColor = theme.surface2; }}
                 onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); }}
                 onDrop={(e) => {
                   e.preventDefault();
@@ -393,14 +420,14 @@ export function BaseNode(props: NodeProps) {
         {/* Result placeholder or shimmer loading */}
         {data.behavior === 'dynamic' && (!data.results || data.results.length === 0) ? (
           data.status === 'running' ? (
-            <div className="self-stretch bg-[#212121] rounded-2xl overflow-hidden h-[320px] shimmer" />
+            <div className="self-stretch rounded-2xl overflow-hidden h-[320px] shimmer" style={{ backgroundColor: theme.previewBg }} />
           ) : (
-            <div className="self-stretch bg-[#212121] rounded-2xl overflow-hidden h-[320px] checkerboard" />
+            <div className="self-stretch rounded-2xl overflow-hidden h-[320px] checkerboard" style={{ backgroundColor: theme.previewBg }} />
           )
         ) : null}
         {data.results && data.results.length > 0 ? (
           <div className="self-stretch">
-            <div className="relative bg-[#212121] rounded-2xl overflow-hidden group/preview">
+            <div className="relative rounded-2xl overflow-hidden group/preview" style={{ backgroundColor: theme.previewBg }}>
               {(() => {
                 const result = data.results[data.selectedResultIndex || 0];
                 if (!result) return null;
@@ -438,9 +465,14 @@ export function BaseNode(props: NodeProps) {
                 data.status === 'running'
                   ? 'bg-yellow-900/50 text-yellow-400 cursor-wait border border-yellow-700/50'
                   : missingRequiredInputs.length > 0
-                    ? 'bg-transparent text-zinc-600 border border-[#212121] cursor-not-allowed'
-                    : 'bg-transparent hover:bg-[#212121] text-white border border-[#292929]'
+                    ? 'bg-transparent text-zinc-600 cursor-not-allowed'
+                    : 'bg-transparent text-white'
               }`}
+              style={
+                data.status === 'running' ? undefined
+                : missingRequiredInputs.length > 0 ? { border: `1px solid ${theme.border1}` }
+                : { border: `1px solid ${theme.border2}` }
+              }
               disabled={data.status === 'running' || missingRequiredInputs.length > 0}
               onClick={(e) => {
                 e.stopPropagation();

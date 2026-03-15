@@ -18,6 +18,7 @@ import {
   Eye,
 } from 'lucide-react';
 import type { FlowNodeType } from '@/lib/types';
+import { theme } from '@/lib/theme';
 
 interface QuickAction {
   icon: React.ReactNode;
@@ -95,10 +96,10 @@ export function QuickActionsBar({ nodeId, selected, hovered, mode, fileUrl, onFu
 
   return (
     <div
-      className={`absolute bottom-full left-1/2 mb-8 flex items-center gap-1 bg-[#1a1a1a] border border-[#333] rounded-full px-2 py-1.5 transition-opacity duration-200 nodrag ${
+      className={`absolute bottom-full left-1/2 mb-8 flex items-center gap-1 rounded-full px-2 py-1.5 transition-opacity duration-200 nodrag ${
         visible ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'
       }`}
-      style={{ transform: `translateX(-50%) scale(${1 / zoom})`, transformOrigin: 'bottom center' }}
+      style={{ background: theme.toolbarBg, border: `1px solid ${theme.toolbarBorder}`, transform: `translateX(-50%) scale(${1 / zoom})`, transformOrigin: 'bottom center' }}
       onClick={(e) => e.stopPropagation()}
       onMouseEnter={() => {
         clearTimeout(timerRef.current);
@@ -120,7 +121,7 @@ export function QuickActionsBar({ nodeId, selected, hovered, mode, fileUrl, onFu
           {action.icon}
         </button>
       ))}
-      <div className="w-px h-5 bg-[#333] mx-0.5" />
+      <div className="w-px h-5 mx-0.5" style={{ background: theme.border3 }} />
       <button
         className="w-8 h-8 flex items-center justify-center rounded-full text-zinc-400 hover:text-white hover:bg-[#333] transition-colors"
         title="Preview"
@@ -128,7 +129,7 @@ export function QuickActionsBar({ nodeId, selected, hovered, mode, fileUrl, onFu
       >
         <Eye size={16} />
       </button>
-      {(fileUrl || onFullscreen) && <div className="w-px h-5 bg-[#333] mx-0.5" />}
+      {(fileUrl || onFullscreen) && <div className="w-px h-5 mx-0.5" style={{ background: theme.border3 }} />}
       {fileUrl && (
         <button
           className="w-8 h-8 flex items-center justify-center rounded-full text-zinc-400 hover:text-white hover:bg-[#333] transition-colors"
