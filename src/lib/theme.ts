@@ -3,7 +3,7 @@
 
 export const theme = {
   // ── Surfaces ──
-  canvas:        '#0f0f0f',
+  canvas:        '#0a0a0a',
   surface1:      '#171717',  // node bg, toolbars, top bar, input bg
   surface2:      '#212121',  // preview areas, dropdowns, secondary bg
   surface3:      '#1a1a1a',  // floating toolbars, menus

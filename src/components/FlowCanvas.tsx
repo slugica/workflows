@@ -850,7 +850,7 @@ export function FlowCanvas() {
         connectionLineComponent={CustomConnectionLine}
         proOptions={{ hideAttribution: true }}
       >
-        <Background variant={BackgroundVariant.Dots} gap={12} size={0.5} color="rgba(255,255,255,0.25)" />
+        <Background variant={BackgroundVariant.Dots} gap={30} size={1.2} color="rgba(255,255,255,0.25)" />
         <MiniMap
           style={{ background: theme.surface1, borderColor: theme.border1 }}
           className="!rounded-lg"

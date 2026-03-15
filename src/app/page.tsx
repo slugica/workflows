@@ -9,7 +9,7 @@ import { Toolbar } from '@/components/panels/Toolbar';
 export default function Home() {
   return (
     <ReactFlowProvider>
-      <div className="h-screen w-screen flex flex-col bg-[#141414] text-white overflow-hidden">
+      <div className="h-screen w-screen flex flex-col bg-[#0a0a0a] text-white overflow-hidden">
         <Toolbar />
         <div className="flex flex-1 overflow-hidden">
           <Sidebar />
